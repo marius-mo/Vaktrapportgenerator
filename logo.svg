@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <!-- Blue "A" letter -->
+  <g id="blue-a">
+    <!-- Main A shape -->
+    <path d="M 25 50 L 20 40 L 20 35 L 25 20 L 30 20 L 35 35 L 35 40 L 30 50 Z" fill="#0066CC" stroke="none"/>
+    <!-- Oval that weaves through A -->
+    <ellipse cx="27.5" cy="35" rx="8" ry="4" fill="none" stroke="#0066CC" stroke-width="1.5"/>
+    <!-- Path to make oval appear behind left strokes and in front of right strokes -->
+    <path d="M 25 50 L 20 40 L 20 35 L 19 35" fill="none" stroke="#0066CC" stroke-width="2"/>
+    <path d="M 30 50 L 35 40 L 35 35 L 36 35" fill="none" stroke="#0066CC" stroke-width="2"/>
+  </g>
+  
+  <!-- Red "AIRLIFT" text -->
+  <text x="45" y="38" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#CC0000" letter-spacing="-1">
+    AIRLIFT
+  </text>
+</svg>
+

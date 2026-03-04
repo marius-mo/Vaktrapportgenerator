@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Modern vaktrapport generator for shift reports">
+    <title>Vaktrapport - Skifterapport Generator</title>
+    <!-- Inter Font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="filepath-header">Sharepoint: \Technical - Part-145\Planning\Status reports - Handover\LOS Bergen</div>
+        <header>
+            <h1 id="reportTitle">Vaktrapport</h1>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+                <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z"/>
+                </svg>
+                <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </header>
+
+        <form id="reportForm">
+            <div class="form-section">
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label for="date">Dato:</label>
+                        <input type="date" id="date" name="date" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="base">Base:</label>
+                        <select id="base" name="base" required>
+                            <option value="">Velg base...</option>
+                            <option value="Bergen">Bergen</option>
+                            <option value="Tromsø">Tromsø</option>
+                            <option value="Hammerfest">Hammerfest</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vakttype">Vakttype:</label>
+                        <select id="vakttype" name="vakttype" required>
+                            <option value="">Velg vakttype...</option>
+                            <option value="LOS">LOS</option>
+                            <option value="Politi">Politi</option>
+                            <option value="LOS/Politi">LOS/Politi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Personer involvert:</label>
+                    <div class="person-selector">
+                        <div class="person-selector-left">
+                            <select id="personDropdown" name="personDropdown">
+                                <option value="">Velg person...</option>
+                                <option value="Marius Høvik">Marius Høvik</option>
+                                <option value="Torfinn Roti">Torfinn Roti</option>
+                                <option value="Eirik Dypevik">Eirik Dypevik</option>
+                                <option value="Johnny Mæland">Johnny Mæland</option>
+                                <option value="Håvard Adsen">Håvard Adsen</option>
+                                <option value="Odd Fiksdal">Odd Fiksdal</option>
+                                <option value="Johan Karlsson">Johan Karlsson</option>
+                                <option value="Leif Rune Krogh Hus">Leif Rune Krogh Hus</option>
+                                <option value="Stig Hestad">Stig Hestad</option>
+                                <option value="Jøran Festervoll">Jøran Festervoll</option>
+                                <option value="Elliot Jaako">Elliot Jaako</option>
+                            </select>
+                            <input type="text" id="personExtra" name="personExtra" placeholder="Andre navn (kommaseparert)">
+                        </div>
+                        <div class="person-selector-right">
+                            <div id="selectedPersons" class="selected-persons-list"></div>
+                        </div>
+                        <input type="hidden" id="person" name="person" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="statusBase">Status base:</label>
+                    <textarea id="statusBase" name="statusBase" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="fileUpload">Vedlegg (fotos, PDF, etc.):</label>
+                    <input type="file" id="fileUpload" name="fileUpload" multiple accept="image/*,.pdf" style="display: none;">
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <p>Klikk for å laste opp filer</p>
+                        <p class="file-upload-hint">Støtter bilder (JPG, PNG, etc.) og PDF</p>
+                    </div>
+                    <div id="uploadedFiles" class="uploaded-files-container"></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Helikoptre</h2>
+                <div class="helicopter-group">
+                    <div class="helicopter-item">
+                        <div class="helicopter-header">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="heliOXH" name="heliOXH" class="helicopter-checkbox">
+                                <span>LN-OXH</span>
+                            </label>
+                            <div class="helicopter-status" id="heliOXHStatus" style="display: none;">
+                                <label class="status-label status-serviceable">
+                                    <input type="radio" name="heliOXHStatus" value="SERVICEABLE" id="heliOXHServiceable">
+                                    <span>SERVICEABLE</span>
+                                </label>
+                                <label class="status-label status-unserviceable">
+                                    <input type="radio" name="heliOXHStatus" value="UNSERVICEABLE" id="heliOXHUnserviceable">
+                                    <span>UNSERVICEABLE</span>
+                                </label>
+                            </div>
+                        </div>
+                        <textarea id="heliOXHText" name="heliOXHText" class="helicopter-text" placeholder="Skriv her..." disabled></textarea>
+                    </div>
+
+                    <div class="helicopter-item">
+                        <div class="helicopter-header">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="heliOXI" name="heliOXI" class="helicopter-checkbox">
+                                <span>LN-OXI</span>
+                            </label>
+                            <div class="helicopter-status" id="heliOXIStatus" style="display: none;">
+                                <label class="status-label status-serviceable">
+                                    <input type="radio" name="heliOXIStatus" value="SERVICEABLE" id="heliOXIServiceable">
+                                    <span>SERVICEABLE</span>
+                                </label>
+                                <label class="status-label status-unserviceable">
+                                    <input type="radio" name="heliOXIStatus" value="UNSERVICEABLE" id="heliOXIUnserviceable">
+                                    <span>UNSERVICEABLE</span>
+                                </label>
+                            </div>
+                        </div>
+                        <textarea id="heliOXIText" name="heliOXIText" class="helicopter-text" placeholder="Skriv her..." disabled></textarea>
+                    </div>
+
+                    <div class="helicopter-item">
+                        <div class="helicopter-header">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="heliOXJ" name="heliOXJ" class="helicopter-checkbox">
+                                <span>LN-OXJ</span>
+                            </label>
+                            <div class="helicopter-status" id="heliOXJStatus" style="display: none;">
+                                <label class="status-label status-serviceable">
+                                    <input type="radio" name="heliOXJStatus" value="SERVICEABLE" id="heliOXJServiceable">
+                                    <span>SERVICEABLE</span>
+                                </label>
+                                <label class="status-label status-unserviceable">
+                                    <input type="radio" name="heliOXJStatus" value="UNSERVICEABLE" id="heliOXJUnserviceable">
+                                    <span>UNSERVICEABLE</span>
+                                </label>
+                            </div>
+                        </div>
+                        <textarea id="heliOXJText" name="heliOXJText" class="helicopter-text" placeholder="Skriv her..." disabled></textarea>
+                    </div>
+
+                    <div class="helicopter-item">
+                        <div class="helicopter-header">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="heliOXK" name="heliOXK" class="helicopter-checkbox">
+                                <span>LN-OXK</span>
+                            </label>
+                            <div class="helicopter-status" id="heliOXKStatus" style="display: none;">
+                                <label class="status-label status-serviceable">
+                                    <input type="radio" name="heliOXKStatus" value="SERVICEABLE" id="heliOXKServiceable">
+                                    <span>SERVICEABLE</span>
+                                </label>
+                                <label class="status-label status-unserviceable">
+                                    <input type="radio" name="heliOXKStatus" value="UNSERVICEABLE" id="heliOXKUnserviceable">
+                                    <span>UNSERVICEABLE</span>
+                                </label>
+                            </div>
+                        </div>
+                        <textarea id="heliOXKText" name="heliOXKText" class="helicopter-text" placeholder="Skriv her..." disabled></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Kontrollpunkter</h2>
+                <div class="checkbox-group">
+                    <label class="checkbox-label kontrollpunkt-item">
+                        <input type="checkbox" id="kaffi" name="kaffi">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Kaffi</span>
+                    </label>
+                    <label class="checkbox-label kontrollpunkt-item">
+                        <input type="checkbox" id="fuelTraktor" name="fuelTraktor">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Fuel traktor</span>
+                    </label>
+                    <label class="checkbox-label kontrollpunkt-item">
+                        <input type="checkbox" id="vaskeGulv" name="vaskeGulv">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Vaske gulv</span>
+                    </label>
+                    <label class="checkbox-label kontrollpunkt-item">
+                        <input type="checkbox" id="tommeBoss" name="tommeBoss">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Tømme boss</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" id="exportPdf" class="btn btn-primary">Eksporter til PDF</button>
+                <button type="reset" class="btn btn-secondary">Nullstill skjema</button>
+            </div>
+        </form>
+
+        <div class="register-section">
+            <h2>Tidligere rapporter</h2>
+            <div id="reportRegister" class="report-register">
+                <p class="no-reports">Ingen tidligere rapporter registrert</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase: erstatt verdiene under med din egen config fra Firebase Console -->
+    <script>
+    window.FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCH6_o6M_6Lgwrwf7fpWhunqBadI3ZPQHs",
+  authDomain: "vaktrapportgenerator.firebaseapp.com",
+  projectId: "vaktrapportgenerator",
+  storageBucket: "vaktrapportgenerator.firebasestorage.app",
+  messagingSenderId: "93816409964",
+  appId: "1:93816409964:web:c43519e93d3e892364ad49"
+};
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,1426 @@
+// ============================================
+// THEME TOGGLE FUNCTIONALITY
+// ============================================
+(function() {
+    'use strict';
+    
+    // Get theme from localStorage or system preference
+    function getInitialTheme() {
+        const storedTheme = localStorage.getItem('theme');
+        if (storedTheme) {
+            return storedTheme;
+        }
+        // Check system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+        }
+        return 'light';
+    }
+    
+    // Set theme
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }
+    
+    // Initialize theme immediately (before DOMContentLoaded to prevent flash)
+    const initialTheme = getInitialTheme();
+    setTheme(initialTheme);
+    
+    // Theme toggle handler
+    function initThemeToggle() {
+        const themeToggle = document.getElementById('themeToggle');
+        if (!themeToggle) return;
+        
+        themeToggle.addEventListener('click', function() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+            
+            // Add a subtle animation effect
+            themeToggle.style.transform = 'translateY(-50%) scale(0.9)';
+            setTimeout(() => {
+                themeToggle.style.transform = 'translateY(-50%) scale(1)';
+            }, 150);
+        });
+    }
+    
+    // Listen for system theme changes
+    if (window.matchMedia) {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', function(e) {
+            // Only auto-switch if user hasn't manually set a preference
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+    
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initThemeToggle);
+    } else {
+        initThemeToggle();
+    }
+})();
+
+// Firebase Firestore: init hvis config er satt (erstatt REPLACE_* i index.html med din config)
+window.firestoreDb = null;
+window.vaktrapportDocsList = []; // liste med { id, ...reportData } fra Firestore
+(function initFirebase() {
+    var config = window.FIREBASE_CONFIG;
+    if (!config || !config.apiKey || config.apiKey.indexOf('REPLACE') !== -1) return;
+    try {
+        firebase.initializeApp(config);
+        window.firestoreDb = firebase.firestore();
+    } catch (e) { console.warn('Firebase init failed:', e); }
+})();
+
+// Enable/disable helicopter text fields and show/hide status checkboxes based on checkbox state
+document.addEventListener('DOMContentLoaded', function() {
+    // Set date to today automatically
+    const dateInput = document.getElementById('date');
+    if (dateInput) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        dateInput.value = `${year}-${month}-${day}`;
+    }
+    
+    // Function to handle helicopter checkbox change
+    function handleHelicopterChange(checkbox) {
+        const helicopterId = checkbox.id;
+        let textFieldId, statusDivId;
+        
+        // Map checkbox ID to text field ID and status div ID
+        if (helicopterId === 'heliOXH') {
+            textFieldId = 'heliOXHText';
+            statusDivId = 'heliOXHStatus';
+        } else if (helicopterId === 'heliOXI') {
+            textFieldId = 'heliOXIText';
+            statusDivId = 'heliOXIStatus';
+        } else if (helicopterId === 'heliOXJ') {
+            textFieldId = 'heliOXJText';
+            statusDivId = 'heliOXJStatus';
+        } else if (helicopterId === 'heliOXK') {
+            textFieldId = 'heliOXKText';
+            statusDivId = 'heliOXKStatus';
+        } else {
+            return; // Unknown helicopter ID
+        }
+        
+        const textField = document.getElementById(textFieldId);
+        const statusDiv = document.getElementById(statusDivId);
+        
+        if (!textField || !statusDiv) {
+            console.error('Could not find text field or status div for:', helicopterId);
+            return;
+        }
+        
+        // Handle checkbox state
+        if (checkbox.checked) {
+            // Checkbox is checked: show status options and enable text field
+            statusDiv.style.display = 'flex';
+            textField.removeAttribute('disabled');
+            textField.disabled = false;
+            // Focus after a short delay
+            setTimeout(() => {
+                textField.focus();
+            }, 50);
+        } else {
+            // Checkbox is unchecked: hide status options and disable text field
+            statusDiv.style.display = 'none';
+            textField.disabled = true;
+            textField.setAttribute('disabled', 'disabled');
+            textField.value = '';
+            // Clear status radio selections
+            const statusRadios = statusDiv.querySelectorAll('input[type="radio"]');
+            statusRadios.forEach(radio => {
+                radio.checked = false;
+            });
+        }
+    }
+    
+    // Add event listeners to all helicopter checkboxes
+    const helicopterCheckboxes = document.querySelectorAll('.helicopter-checkbox');
+    
+    helicopterCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            handleHelicopterChange(this);
+        });
+    });
+
+    // PDF Export functionality
+    const exportPdfBtn = document.getElementById('exportPdf');
+    exportPdfBtn.addEventListener('click', function() {
+        generatePDF();
+    });
+
+
+    // Store selected persons
+    let selectedPersons = [];
+    
+    // All available persons in the dropdown
+    const allAvailablePersons = ['Marius Høvik', 'Torfinn Roti', 'Eirik Dypevik', 'Johnny Mæland', 'Håvard Adsen', 'Odd Fiksdal', 'Johan Karlsson', 'Leif Rune Krogh Hus', 'Stig Hestad', 'Jøran Festervoll', 'Elliot Jaako'];
+    
+    // Update dropdown options to exclude selected persons
+    function updatePersonDropdown() {
+        const dropdown = document.getElementById('personDropdown');
+        const currentValue = dropdown.value;
+        
+        // Clear all options except the first placeholder
+        dropdown.innerHTML = '<option value="">Velg person...</option>';
+        
+        // Add only persons that are not selected
+        allAvailablePersons.forEach(person => {
+            if (!selectedPersons.includes(person)) {
+                const option = document.createElement('option');
+                option.value = person;
+                option.textContent = person;
+                dropdown.appendChild(option);
+            }
+        });
+        
+        // Restore the current value if it's still valid
+        if (currentValue && !selectedPersons.includes(currentValue)) {
+            dropdown.value = currentValue;
+        } else {
+            dropdown.value = '';
+        }
+    }
+    
+    // Update person field and display
+    function updatePersonField() {
+        const personField = document.getElementById('person');
+        const extraField = document.getElementById('personExtra').value.trim();
+        
+        const allNames = [...selectedPersons];
+        if (extraField) {
+            // Split by comma and add each name
+            const extraNames = extraField.split(',').map(n => n.trim()).filter(n => n);
+            allNames.push(...extraNames);
+        }
+        
+        personField.value = allNames.join(', ');
+        
+        // Update required validation
+        if (allNames.length > 0) {
+            personField.setCustomValidity('');
+        } else {
+            personField.setCustomValidity('Velg minst én person eller skriv inn navn');
+        }
+        
+        // Update display and dropdown
+        updateSelectedPersonsDisplay();
+        updatePersonDropdown();
+    }
+    
+    // Update the display of selected persons
+    function updateSelectedPersonsDisplay() {
+        const container = document.getElementById('selectedPersons');
+        container.innerHTML = '';
+        
+        if (selectedPersons.length === 0) {
+            container.innerHTML = '<p class="no-persons">Ingen personer valgt</p>';
+            return;
+        }
+        
+        selectedPersons.forEach((name, index) => {
+            const personItem = document.createElement('div');
+            personItem.className = 'selected-person-item';
+            personItem.innerHTML = `
+                <span>${name}</span>
+                <button type="button" class="remove-person-btn" data-index="${index}">×</button>
+            `;
+            container.appendChild(personItem);
+        });
+        
+        // Add event listeners to remove buttons
+        container.querySelectorAll('.remove-person-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                selectedPersons.splice(index, 1);
+                updatePersonField();
+            });
+        });
+    }
+    
+    // Initialize dropdown on page load
+    updatePersonDropdown();
+    
+    // File upload handling - use window.uploadedFiles directly
+    window.uploadedFiles = [];
+    const uploadedFiles = window.uploadedFiles; // Local reference for convenience
+    
+    const fileUploadInput = document.getElementById('fileUpload');
+    const fileUploadArea = document.getElementById('fileUploadArea');
+    const uploadedFilesContainer = document.getElementById('uploadedFiles');
+    
+    // Prevent default drag and drop behavior on the page
+    // (The upload area will handle its own events with stopPropagation)
+    document.addEventListener('dragover', function(e) {
+        e.preventDefault();
+    });
+    
+    document.addEventListener('drop', function(e) {
+        e.preventDefault();
+    });
+    
+    // Function to process and add files
+    function processFiles(files) {
+        Array.from(files).forEach(file => {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedFiles.push({
+                        name: file.name,
+                        type: file.type,
+                        data: e.target.result,
+                        isImage: true
+                    });
+                    updateUploadedFilesDisplay();
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type === 'application/pdf') {
+                uploadedFiles.push({
+                    name: file.name,
+                    type: file.type,
+                    data: null,
+                    isImage: false
+                });
+                updateUploadedFilesDisplay();
+            }
+        });
+    }
+    
+    // Click on upload area triggers file input
+    if (fileUploadArea) {
+        fileUploadArea.addEventListener('click', function() {
+            fileUploadInput.click();
+        });
+        
+        // Drag and drop functionality
+        fileUploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileUploadArea.style.borderColor = '#667eea';
+            fileUploadArea.style.backgroundColor = '#e8eaff';
+        });
+        
+        fileUploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileUploadArea.style.borderColor = '#e0e0e0';
+            fileUploadArea.style.backgroundColor = '#f8f9fa';
+        });
+        
+        fileUploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileUploadArea.style.borderColor = '#e0e0e0';
+            fileUploadArea.style.backgroundColor = '#f8f9fa';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFiles(files);
+            }
+        });
+    }
+    
+    // Handle file selection from input
+    if (fileUploadInput) {
+        fileUploadInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                processFiles(files);
+            }
+            // Reset input to allow selecting same file again
+            e.target.value = '';
+        });
+    }
+    
+    // Update display of uploaded files
+    function updateUploadedFilesDisplay() {
+        if (!uploadedFilesContainer) return;
+        
+        uploadedFilesContainer.innerHTML = '';
+        
+        uploadedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'uploaded-file-item';
+            
+            if (file.isImage) {
+                fileItem.innerHTML = `
+                    <img src="${file.data}" alt="${file.name}">
+                    <div class="file-info">${file.name}</div>
+                    <button type="button" class="remove-file-btn" data-index="${index}">×</button>
+                `;
+            } else {
+                fileItem.className += ' pdf-file';
+                fileItem.innerHTML = `
+                    <div class="file-icon">📄</div>
+                    <div class="file-info">${file.name}</div>
+                    <button type="button" class="remove-file-btn" data-index="${index}">×</button>
+                `;
+            }
+            
+            uploadedFilesContainer.appendChild(fileItem);
+        });
+        
+        // Add event listeners to remove buttons
+        uploadedFilesContainer.querySelectorAll('.remove-file-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                uploadedFiles.splice(index, 1);
+                updateUploadedFilesDisplay();
+            });
+        });
+    }
+    
+    // Make function available globally
+    window.updateUploadedFilesDisplay = updateUploadedFilesDisplay;
+    
+    // Add person from dropdown
+    document.getElementById('personDropdown').addEventListener('change', function() {
+        const selectedValue = this.value;
+        if (selectedValue && !selectedPersons.includes(selectedValue)) {
+            selectedPersons.push(selectedValue);
+            this.value = ''; // Reset dropdown
+            updatePersonField();
+        }
+    });
+    
+    // Update when extra field changes
+    document.getElementById('personExtra').addEventListener('input', updatePersonField);
+    
+    // Initial update
+    updatePersonField();
+    
+    // Make functions available globally for loadReport
+    window.updatePersonField = updatePersonField;
+    window.updatePersonDropdown = updatePersonDropdown;
+    window.selectedPersons = selectedPersons;
+
+    // Update title based on vakttype selection
+    const vakttypeSelect = document.getElementById('vakttype');
+    const reportTitle = document.getElementById('reportTitle');
+    
+    function updateTitle() {
+        const vakttype = vakttypeSelect.value;
+        if (vakttype) {
+            reportTitle.textContent = `Vaktrapport - ${vakttype}`;
+        } else {
+            reportTitle.textContent = 'Vaktrapport';
+        }
+    }
+    
+    vakttypeSelect.addEventListener('change', updateTitle);
+    
+    // Reset title and hide status fields when form is reset
+    const reportForm = document.getElementById('reportForm');
+    reportForm.addEventListener('reset', function() {
+        setTimeout(() => {
+            reportTitle.textContent = 'Vaktrapport';
+            // Hide all helicopter status fields
+            document.querySelectorAll('.helicopter-status').forEach(statusDiv => {
+                statusDiv.style.display = 'none';
+            });
+            // Clear all helicopter status radio selections
+            document.querySelectorAll('.helicopter-status input[type="radio"]').forEach(radio => {
+                radio.checked = false;
+            });
+            // Clear person selections
+            selectedPersons = [];
+            if (window.selectedPersons) {
+                window.selectedPersons.length = 0;
+            }
+            document.getElementById('personDropdown').value = '';
+            document.getElementById('personExtra').value = '';
+            if (window.updatePersonField) {
+                window.updatePersonField();
+            }
+            if (window.updatePersonDropdown) {
+                window.updatePersonDropdown();
+            }
+            // Clear uploaded files
+            if (window.uploadedFiles) {
+                window.uploadedFiles.length = 0;
+            }
+            if (window.updateUploadedFilesDisplay) {
+                window.updateUploadedFilesDisplay();
+            }
+        }, 0);
+    });
+
+    // Load and display report register
+    loadReportRegister();
+});
+
+// Store and retrieve reports: Firestore (felles) eller localStorage (lokal fallback)
+function saveReportToRegister(reportData) {
+    if (window.firestoreDb) {
+        window.firestoreDb.collection('vaktrapporter').add(reportData)
+            .then(function() { loadReportRegister(); })
+            .catch(function(err) {
+                console.error('Firestore save error:', err);
+                alert('Kunne ikke lagre rapport til skyen. Prøv igjen.');
+            });
+        return;
+    }
+    var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
+    reports.unshift(reportData);
+    if (reports.length > 50) reports = reports.slice(0, 50);
+    localStorage.setItem('vaktrapport_reports', JSON.stringify(reports));
+    loadReportRegister();
+}
+
+function loadReportRegister() {
+    var registerDiv = document.getElementById('reportRegister');
+    if (window.firestoreDb) {
+        window.firestoreDb.collection('vaktrapporter')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get()
+            .then(function(snapshot) {
+                window.vaktrapportDocsList = snapshot.docs.map(function(d) {
+                    var data = d.data();
+                    data.id = d.id;
+                    return data;
+                });
+                renderReportRegister(window.vaktrapportDocsList, registerDiv);
+            })
+            .catch(function(err) {
+                console.error('Firestore load error:', err);
+                registerDiv.innerHTML = '<p class="no-reports">Kunne ikke hente rapporter fra skyen.</p>';
+            });
+        return;
+    }
+    var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
+    window.vaktrapportDocsList = reports.map(function(r, i) { r.id = i; return r; });
+    renderReportRegister(reports, registerDiv);
+}
+
+function renderReportRegister(reports, registerDiv) {
+    if (!reports || reports.length === 0) {
+        registerDiv.innerHTML = '<p class="no-reports">Ingen tidligere rapporter registrert</p>';
+        return;
+    }
+    registerDiv.innerHTML = reports.map(function(report, index) {
+        var reportDate = report.date || 'Ikke angitt';
+        var base = report.base || 'Ikke angitt';
+        var vakttype = report.vakttype || '';
+        var person = report.person || 'Ikke angitt';
+        return '<div class="report-item">' +
+            '<div class="report-item-info">' +
+            '<div class="report-item-date">' + formatDate(reportDate) + '</div>' +
+            '<div class="report-item-details">Base: ' + base + (vakttype ? ' | Vakttype: ' + vakttype : '') + ' | Personer: ' + person + '</div>' +
+            '</div>' +
+            '<div class="report-item-actions">' +
+            '<button class="btn-small btn-view" onclick="loadReport(' + index + ')">Vis</button>' +
+            '<button class="btn-small btn-delete" onclick="deleteReport(' + index + ')">Slett</button>' +
+            '</div></div>';
+    }).join('');
+}
+
+function loadReport(index) {
+    var reports = window.vaktrapportDocsList || [];
+    if (index < 0 || index >= reports.length) return;
+    var report = reports[index];
+        
+        // Populate form with report data
+        if (report.date) document.getElementById('date').value = report.date;
+        if (report.base) document.getElementById('base').value = report.base;
+        if (report.vakttype) {
+            document.getElementById('vakttype').value = report.vakttype;
+            // Update title when loading report
+            const reportTitle = document.getElementById('reportTitle');
+            reportTitle.textContent = `Vaktrapport - ${report.vakttype}`;
+        }
+        
+        // Load person selections
+        if (report.person) {
+            const personNames = report.person.split(',').map(n => n.trim()).filter(n => n);
+            const knownNames = ['Marius Høvik', 'Torfinn Roti', 'Eirik Dypevik', 'Johnny Mæland', 'Håvard Adsen', 'Odd Fiksdal', 'Johan Karlsson', 'Leif Rune Krogh Hus', 'Stig Hestad', 'Jøran Festervoll', 'Elliot Jaako'];
+            const extraNames = [];
+            
+            // Clear previous selections
+            if (window.selectedPersons) {
+                window.selectedPersons.length = 0;
+            }
+            selectedPersons = [];
+            
+            personNames.forEach(name => {
+                if (knownNames.includes(name)) {
+                    if (!selectedPersons.includes(name)) {
+                        selectedPersons.push(name);
+                    }
+                } else if (name) {
+                    extraNames.push(name);
+                }
+            });
+            
+            if (extraNames.length > 0) {
+                document.getElementById('personExtra').value = extraNames.join(', ');
+            } else {
+                document.getElementById('personExtra').value = '';
+            }
+            
+            if (window.updatePersonField) {
+                window.updatePersonField();
+            }
+            if (window.updatePersonDropdown) {
+                window.updatePersonDropdown();
+            }
+        }
+        if (report.statusBase) document.getElementById('statusBase').value = report.statusBase;
+        
+        document.getElementById('kaffi').checked = report.kaffi || false;
+        document.getElementById('fuelTraktor').checked = report.fuelTraktor || false;
+        document.getElementById('vaskeGulv').checked = report.vaskeGulv || false;
+        document.getElementById('tommeBoss').checked = report.tommeBoss || false;
+        
+        document.getElementById('heliOXH').checked = report.heliOXH || false;
+        document.getElementById('heliOXHText').value = report.heliOXHText || '';
+        document.getElementById('heliOXHText').disabled = !report.heliOXH;
+        const heliOXHStatusDiv = document.getElementById('heliOXHStatus');
+        if (heliOXHStatusDiv) {
+            heliOXHStatusDiv.style.display = report.heliOXH ? 'flex' : 'none';
+            if (report.heliOXHStatus) {
+                const statusRadio = document.querySelector(`input[name="heliOXHStatus"][value="${report.heliOXHStatus}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+        }
+        
+        document.getElementById('heliOXI').checked = report.heliOXI || false;
+        document.getElementById('heliOXIText').value = report.heliOXIText || '';
+        document.getElementById('heliOXIText').disabled = !report.heliOXI;
+        const heliOXIStatusDiv = document.getElementById('heliOXIStatus');
+        if (heliOXIStatusDiv) {
+            heliOXIStatusDiv.style.display = report.heliOXI ? 'flex' : 'none';
+            if (report.heliOXIStatus) {
+                const statusRadio = document.querySelector(`input[name="heliOXIStatus"][value="${report.heliOXIStatus}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+        }
+        
+        document.getElementById('heliOXJ').checked = report.heliOXJ || false;
+        document.getElementById('heliOXJText').value = report.heliOXJText || '';
+        document.getElementById('heliOXJText').disabled = !report.heliOXJ;
+        const heliOXJStatusDiv = document.getElementById('heliOXJStatus');
+        if (heliOXJStatusDiv) {
+            heliOXJStatusDiv.style.display = report.heliOXJ ? 'flex' : 'none';
+            if (report.heliOXJStatus) {
+                const statusRadio = document.querySelector(`input[name="heliOXJStatus"][value="${report.heliOXJStatus}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+        }
+        
+        document.getElementById('heliOXK').checked = report.heliOXK || false;
+        document.getElementById('heliOXKText').value = report.heliOXKText || '';
+        document.getElementById('heliOXKText').disabled = !report.heliOXK;
+        const heliOXKStatusDiv = document.getElementById('heliOXKStatus');
+        if (heliOXKStatusDiv) {
+            heliOXKStatusDiv.style.display = report.heliOXK ? 'flex' : 'none';
+            if (report.heliOXKStatus) {
+                const statusRadio = document.querySelector(`input[name="heliOXKStatus"][value="${report.heliOXKStatus}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+        }
+        
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteReport(index) {
+    if (!confirm('Er du sikker på at du vil slette denne rapporten?')) return;
+    if (window.firestoreDb && window.vaktrapportDocsList && window.vaktrapportDocsList[index]) {
+        var docId = window.vaktrapportDocsList[index].id;
+        if (docId && typeof docId === 'string' && docId.length > 0) {
+            window.firestoreDb.collection('vaktrapporter').doc(docId).delete()
+                .then(function() { loadReportRegister(); })
+                .catch(function(err) {
+                    console.error('Firestore delete error:', err);
+                    alert('Kunne ikke slette rapport.');
+                });
+            return;
+        }
+    }
+    var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
+    reports.splice(index, 1);
+    localStorage.setItem('vaktrapport_reports', JSON.stringify(reports));
+    loadReportRegister();
+}
+
+
+function generatePDF() {
+    // Validate required fields before generating PDF
+    const date = document.getElementById('date').value.trim();
+    const base = document.getElementById('base').value.trim();
+    const vakttype = document.getElementById('vakttype').value.trim();
+    const person = document.getElementById('person').value.trim();
+    const statusBase = document.getElementById('statusBase').value.trim();
+    
+    const missingFields = [];
+    if (!date) missingFields.push('Dato');
+    if (!base) missingFields.push('Base');
+    if (!vakttype) missingFields.push('Vakttype');
+    if (!person) missingFields.push('Personer involvert');
+    if (!statusBase) missingFields.push('Status base');
+    
+    if (missingFields.length > 0) {
+        alert('Vennligst fyll ut alle påkrevde felt:\n\n' + missingFields.join('\n'));
+        return;
+    }
+    
+    // Load logo image first
+    const logoImg = new Image();
+    logoImg.crossOrigin = 'anonymous';
+    logoImg.onload = function() {
+        // Convert image to base64 data URL
+        const canvas = document.createElement('canvas');
+        canvas.width = logoImg.width;
+        canvas.height = logoImg.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(logoImg, 0, 0);
+        const logoData = canvas.toDataURL('image/png');
+        
+        // Store logo dimensions to maintain exact aspect ratio
+        const logoInfo = {
+            data: logoData,
+            width: logoImg.width,
+            height: logoImg.height
+        };
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        // Get form values (already validated above)
+        const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover\\LOS Bergen';
+        
+        const heliOXH = document.getElementById('heliOXH').checked;
+        const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
+        const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
+        const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
+        
+        const heliOXI = document.getElementById('heliOXI').checked;
+        const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
+        const heliOXIStatusRadio = heliOXI ? document.querySelector('input[name="heliOXIStatus"]:checked') : null;
+        const heliOXIStatus = heliOXIStatusRadio ? heliOXIStatusRadio.value : '';
+        
+        const heliOXJ = document.getElementById('heliOXJ').checked;
+        const heliOXJText = heliOXJ ? document.getElementById('heliOXJText').value : '';
+        const heliOXJStatusRadio = heliOXJ ? document.querySelector('input[name="heliOXJStatus"]:checked') : null;
+        const heliOXJStatus = heliOXJStatusRadio ? heliOXJStatusRadio.value : '';
+        
+        const heliOXK = document.getElementById('heliOXK').checked;
+        const heliOXKText = heliOXK ? document.getElementById('heliOXKText').value : '';
+        const heliOXKStatusRadio = heliOXK ? document.querySelector('input[name="heliOXKStatus"]:checked') : null;
+        const heliOXKStatus = heliOXKStatusRadio ? heliOXKStatusRadio.value : '';
+        
+        // Get uploaded files
+        const files = window.uploadedFiles || [];
+        
+        generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath, 
+            heliOXH, heliOXHText, heliOXHStatus, heliOXI, heliOXIText, heliOXIStatus, 
+            heliOXJ, heliOXJText, heliOXJStatus, heliOXK, heliOXKText, heliOXKStatus, files, logoInfo);
+    };
+    logoImg.onerror = function() {
+        // If logo fails to load, continue without it
+        console.warn('Logo could not be loaded, continuing without logo');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover\\LOS Bergen';
+        
+        const heliOXH = document.getElementById('heliOXH').checked;
+        const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
+        const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
+        const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
+        
+        const heliOXI = document.getElementById('heliOXI').checked;
+        const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
+        const heliOXIStatusRadio = heliOXI ? document.querySelector('input[name="heliOXIStatus"]:checked') : null;
+        const heliOXIStatus = heliOXIStatusRadio ? heliOXIStatusRadio.value : '';
+        
+        const heliOXJ = document.getElementById('heliOXJ').checked;
+        const heliOXJText = heliOXJ ? document.getElementById('heliOXJText').value : '';
+        const heliOXJStatusRadio = heliOXJ ? document.querySelector('input[name="heliOXJStatus"]:checked') : null;
+        const heliOXJStatus = heliOXJStatusRadio ? heliOXJStatusRadio.value : '';
+        
+        const heliOXK = document.getElementById('heliOXK').checked;
+        const heliOXKText = heliOXK ? document.getElementById('heliOXKText').value : '';
+        const heliOXKStatusRadio = heliOXK ? document.querySelector('input[name="heliOXKStatus"]:checked') : null;
+        const heliOXKStatus = heliOXKStatusRadio ? heliOXKStatusRadio.value : '';
+        
+        const files = window.uploadedFiles || [];
+        
+        generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath, 
+            heliOXH, heliOXHText, heliOXHStatus, heliOXI, heliOXIText, heliOXIStatus, 
+            heliOXJ, heliOXJText, heliOXJStatus, heliOXK, heliOXKText, heliOXKStatus, files, null);
+    };
+    logoImg.src = 'assets/airliftlogo.webp';
+}
+
+function generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath,
+    heliOXH, heliOXHText, heliOXHStatus, heliOXI, heliOXIText, heliOXIStatus,
+    heliOXJ, heliOXJText, heliOXJStatus, heliOXK, heliOXKText, heliOXKStatus, files = [], logoInfo = null) {
+    
+    // Website Design System Colors - Aviation Inspired
+    const primaryBlue = [30, 136, 229]; // #1E88E5 - Sky Blue
+    const primaryBlueDark = [21, 101, 192]; // #1565C0 - Deep Blue
+    const primaryNavy = [10, 37, 64]; // #0A2540 - Deep Navy
+    const successGreen = [46, 125, 50]; // #2E7D32 - Forest Green
+    const errorRed = [229, 57, 53]; // #E53935 - Coral Red
+    const warningAmber = [255, 179, 0]; // #FFB300 - Amber
+    
+    // Text Colors
+    const textPrimary = [26, 26, 26]; // #1A1A1A - Primary text
+    const textSecondary = [97, 97, 97]; // #616161 - Secondary text
+    const textTertiary = [158, 158, 158]; // #9E9E9E - Tertiary text
+    
+    // Background Colors
+    const bgPrimary = [255, 255, 255]; // White
+    const bgSecondary = [245, 247, 250]; // #F5F7FA - Light gray
+    const bgTertiary = [232, 236, 241]; // #E8ECF1 - Lighter gray
+    const borderColor = [224, 224, 224]; // #E0E0E0 - Border gray
+    const borderLight = [238, 238, 238]; // #EEEEEE - Light border
+    
+    // Page dimensions: A4 = 210mm x 297mm
+    const leftMargin = 10;
+    const rightMargin = 10;
+    const topMargin = 15;
+    const bottomMargin = 15;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const contentWidth = pageWidth - leftMargin - rightMargin; // 190mm
+    
+    // Reset text color and set font
+    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    doc.setFont('helvetica');
+    
+    // Professional Header with gradient background
+    const headerHeight = 20;
+    doc.setFillColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+    doc.rect(0, 0, pageWidth, headerHeight, 'F');
+    
+    // Add logo if available
+    if (logoInfo && logoInfo.data) {
+        try {
+            // Calculate logo dimensions maintaining exact aspect ratio
+            const maxLogoHeight = 14; // mm - maximum height to fit in header
+            const aspectRatio = logoInfo.width / logoInfo.height;
+            let logoHeight = maxLogoHeight;
+            let logoWidth = logoHeight * aspectRatio;
+            
+            // If width is too large, scale down based on width instead
+            const maxLogoWidth = 40; // mm - maximum width
+            if (logoWidth > maxLogoWidth) {
+                logoWidth = maxLogoWidth;
+                logoHeight = logoWidth / aspectRatio;
+            }
+            
+            // Position logo in top right corner of the blue header
+            const logoX = pageWidth - rightMargin - logoWidth;
+            const logoY = (headerHeight - logoHeight) / 2;
+            doc.addImage(logoInfo.data, 'PNG', logoX, logoY, logoWidth, logoHeight);
+        } catch (error) {
+            console.error('Error adding logo to PDF:', error);
+        }
+    }
+    
+    // Title in header - white text
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    const titleText = vakttype && vakttype !== 'Ikke angitt' 
+        ? `Vaktrapport - ${vakttype}` 
+        : 'Vaktrapport';
+    doc.text(titleText, pageWidth / 2, headerHeight / 2 + 2, { align: 'center' });
+    
+    // SharePoint path in header footer area (subtle)
+    doc.setFontSize(7);
+    doc.setTextColor(200, 200, 200);
+    doc.setFont('helvetica', 'normal');
+    const filePathShort = filePath.length > 60 ? filePath.substring(0, 57) + '...' : filePath;
+    doc.text(filePathShort, leftMargin, headerHeight - 2);
+    
+    // Date in header (right side)
+    doc.setFontSize(8);
+    doc.setTextColor(220, 220, 220);
+    doc.text(formatDate(date), pageWidth - rightMargin, headerHeight - 2, { align: 'right' });
+    
+    let yPos = topMargin + headerHeight + 3;
+    
+    // Information Card Section - Modern card design
+    const infoCardY = yPos;
+    const infoCardHeight = 38;
+    
+    // Card background with subtle shadow effect
+    doc.setFillColor(bgPrimary[0], bgPrimary[1], bgPrimary[2]);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.5);
+    // Use roundedRect if available, otherwise use regular rect
+    if (typeof doc.roundedRect === 'function') {
+        doc.roundedRect(leftMargin, infoCardY, contentWidth, infoCardHeight, 2, 2, 'FD');
+    } else {
+        doc.rect(leftMargin, infoCardY, contentWidth, infoCardHeight, 'FD');
+    }
+    
+    // Card title
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryBlueDark[0], primaryBlueDark[1], primaryBlueDark[2]);
+    doc.text('Rapportinformasjon', leftMargin + 4, infoCardY + 6);
+    
+    // Information grid (2 columns)
+    const infoX1 = leftMargin + 4;
+    const infoX2 = leftMargin + contentWidth / 2 + 2;
+    const infoStartY = infoCardY + 12;
+    let infoY = infoStartY;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    
+    // Column 1
+    doc.text('Dato:', infoX1, infoY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.text(formatDate(date), infoX1 + 18, infoY);
+    infoY += 5.5;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    doc.text('Base:', infoX1, infoY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.text(base || 'Ikke angitt', infoX1 + 18, infoY);
+    
+    // Column 2
+    infoY = infoStartY;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    doc.text('Vakttype:', infoX2, infoY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.text(vakttype || 'Ikke angitt', infoX2 + 25, infoY);
+    infoY += 5.5;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    doc.text('Personer:', infoX2, infoY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    const personText = person.length > 30 ? person.substring(0, 27) + '...' : person;
+    doc.text(personText || 'Ikke angitt', infoX2 + 25, infoY);
+    
+    yPos = infoCardY + infoCardHeight + 6;
+    
+    // Status Base Card Section
+    const statusCardY = yPos;
+    
+    // Card background
+    doc.setFillColor(bgPrimary[0], bgPrimary[1], bgPrimary[2]);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.5);
+    
+    // Calculate text box dimensions
+    const textBoxPadding = 4;
+    const textBoxInnerWidth = contentWidth - (textBoxPadding * 2);
+    const statusBaseText = statusBase || '(Ingen tekst)';
+    const statusBaseLines = doc.splitTextToSize(statusBaseText, textBoxInnerWidth);
+    const lineHeight = 4.5;
+    const minBoxHeight = 18;
+    const calculatedHeight = Math.max(statusBaseLines.length * lineHeight + (textBoxPadding * 2), minBoxHeight);
+    const statusCardHeight = calculatedHeight + 12;
+    
+    if (typeof doc.roundedRect === 'function') {
+        doc.roundedRect(leftMargin, statusCardY, contentWidth, statusCardHeight, 2, 2, 'FD');
+    } else {
+        doc.rect(leftMargin, statusCardY, contentWidth, statusCardHeight, 'FD');
+    }
+    
+    // Section title
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryBlueDark[0], primaryBlueDark[1], primaryBlueDark[2]);
+    doc.text('Status base', leftMargin + 4, statusCardY + 6);
+    
+    // Draw text inside the box
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    doc.text(statusBaseLines, leftMargin + textBoxPadding, statusCardY + 10 + textBoxPadding);
+    
+    yPos = statusCardY + statusCardHeight + 6;
+    
+    // Kontrollpunkter Section - Modern card design
+    const kontrollCardY = yPos;
+    const kontrollCardHeight = 55;
+    
+    // Card background
+    doc.setFillColor(bgPrimary[0], bgPrimary[1], bgPrimary[2]);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.5);
+    if (typeof doc.roundedRect === 'function') {
+        doc.roundedRect(leftMargin, kontrollCardY, contentWidth, kontrollCardHeight, 2, 2, 'FD');
+    } else {
+        doc.rect(leftMargin, kontrollCardY, contentWidth, kontrollCardHeight, 'FD');
+    }
+    
+    // Section title
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryBlueDark[0], primaryBlueDark[1], primaryBlueDark[2]);
+    doc.text('Kontrollpunkter', leftMargin + 4, kontrollCardY + 6);
+    
+    // Helper function to draw modern checkbox with checkmark
+    const drawCheckboxItem = (label, isChecked, x, y) => {
+        const boxSize = 4.5;
+        const boxX = x;
+        const boxY = y - 3;
+        
+        if (isChecked) {
+            // Draw filled success green box
+            doc.setFillColor(successGreen[0], successGreen[1], successGreen[2]);
+            doc.setDrawColor(successGreen[0], successGreen[1], successGreen[2]);
+            doc.setLineWidth(0.8);
+            if (typeof doc.roundedRect === 'function') {
+                doc.roundedRect(boxX, boxY, boxSize, boxSize, 1, 1, 'FD');
+            } else {
+                doc.rect(boxX, boxY, boxSize, boxSize, 'FD');
+            }
+            
+            // Draw white checkmark
+            doc.setDrawColor(255, 255, 255);
+            doc.setLineWidth(1.4);
+            doc.setLineCap('round');
+            doc.setLineJoin('round');
+            doc.line(boxX + 1, boxY + 2.5, boxX + 2.2, boxY + 4);
+            doc.line(boxX + 2.2, boxY + 4, boxX + 4.5, boxY + 1);
+        } else {
+            // Draw empty box with border
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+            doc.setLineWidth(0.6);
+            if (typeof doc.roundedRect === 'function') {
+                doc.roundedRect(boxX, boxY, boxSize, boxSize, 1, 1, 'FD');
+            } else {
+                doc.rect(boxX, boxY, boxSize, boxSize, 'FD');
+            }
+        }
+        
+        // Draw label text
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        if (isChecked) {
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+        } else {
+            doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+        }
+        doc.text(label, boxX + 7, y);
+    };
+    
+    // Draw each checkbox item in two columns
+    const kaffiChecked = document.getElementById('kaffi').checked;
+    const fuelTraktorChecked = document.getElementById('fuelTraktor').checked;
+    const vaskeGulvChecked = document.getElementById('vaskeGulv').checked;
+    const tommeBossChecked = document.getElementById('tommeBoss').checked;
+    
+    // Two-column layout
+    const checkboxStartY = kontrollCardY + 13;
+    const checkboxColumn1X = leftMargin + 4;
+    const checkboxColumn2X = leftMargin + contentWidth / 2 + 2;
+    const checkboxRowHeight = 7.5;
+    
+    // Row 1
+    let checkboxY = checkboxStartY;
+    drawCheckboxItem('Kaffi', kaffiChecked, checkboxColumn1X, checkboxY);
+    drawCheckboxItem('Fuel traktor', fuelTraktorChecked, checkboxColumn2X, checkboxY);
+    checkboxY += checkboxRowHeight;
+    
+    // Row 2
+    drawCheckboxItem('Vaske gulv', vaskeGulvChecked, checkboxColumn1X, checkboxY);
+    drawCheckboxItem('Tømme boss', tommeBossChecked, checkboxColumn2X, checkboxY);
+    
+    yPos = kontrollCardY + kontrollCardHeight + 6;
+    
+    // Helikoptre Section - Modern card design
+    const heliCardY = yPos;
+    let heliCardHeight = 0;
+    let heliContentY = heliCardY;
+    
+    // Calculate total height needed
+    let totalHeliHeight = 12; // Title + padding
+    if (heliOXH) {
+        totalHeliHeight += 14;
+        if (heliOXHText) {
+            const lines = doc.splitTextToSize(heliOXHText || '', contentWidth - 12);
+            totalHeliHeight += lines.length * 4.5;
+        }
+    }
+    if (heliOXI) {
+        totalHeliHeight += 14;
+        if (heliOXIText) {
+            const lines = doc.splitTextToSize(heliOXIText || '', contentWidth - 12);
+            totalHeliHeight += lines.length * 4.5;
+        }
+    }
+    if (heliOXJ) {
+        totalHeliHeight += 14;
+        if (heliOXJText) {
+            const lines = doc.splitTextToSize(heliOXJText || '', contentWidth - 12);
+            totalHeliHeight += lines.length * 4.5;
+        }
+    }
+    if (heliOXK) {
+        totalHeliHeight += 14;
+        if (heliOXKText) {
+            const lines = doc.splitTextToSize(heliOXKText || '', contentWidth - 12);
+            totalHeliHeight += lines.length * 4.5;
+        }
+    }
+    if (!heliOXH && !heliOXI && !heliOXJ && !heliOXK) {
+        totalHeliHeight += 8;
+    }
+    heliCardHeight = Math.max(totalHeliHeight, 22);
+    
+    // Card background
+    doc.setFillColor(bgPrimary[0], bgPrimary[1], bgPrimary[2]);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.5);
+    if (typeof doc.roundedRect === 'function') {
+        doc.roundedRect(leftMargin, heliCardY, contentWidth, heliCardHeight, 2, 2, 'FD');
+    } else {
+        doc.rect(leftMargin, heliCardY, contentWidth, heliCardHeight, 'FD');
+    }
+    
+    // Section title
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryBlueDark[0], primaryBlueDark[1], primaryBlueDark[2]);
+    doc.text('Helikoptre', leftMargin + 4, heliCardY + 6);
+    
+    heliContentY = heliCardY + 12;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    
+    // Helper function to draw status badge
+    const drawStatusBadge = (status, x, y) => {
+        const statusText = `Status: ${status}`;
+        const textWidth = doc.getTextWidth(statusText);
+        const badgePadding = 2;
+        const badgeHeight = 5;
+        const badgeWidth = textWidth + (badgePadding * 2);
+        
+        if (status === 'SERVICEABLE') {
+            doc.setFillColor(successGreen[0], successGreen[1], successGreen[2]);
+            doc.setTextColor(255, 255, 255);
+        } else if (status === 'UNSERVICEABLE') {
+            doc.setFillColor(errorRed[0], errorRed[1], errorRed[2]);
+            doc.setTextColor(255, 255, 255);
+        }
+        
+            if (typeof doc.roundedRect === 'function') {
+                doc.roundedRect(x, y - 3.5, badgeWidth, badgeHeight, 1, 1, 'F');
+            } else {
+                doc.rect(x, y - 3.5, badgeWidth, badgeHeight, 'F');
+            }
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text(statusText, x + badgePadding, y);
+        
+        // Reset
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+    };
+    
+    if (heliOXH) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.text('LN-OXH', leftMargin + 4, heliContentY);
+        heliContentY += 5.5;
+        
+        if (heliOXHStatus) {
+            drawStatusBadge(heliOXHStatus, leftMargin + 4, heliContentY);
+            heliContentY += 7;
+        }
+        
+        if (heliOXHText) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const linesOXH = doc.splitTextToSize(heliOXHText, contentWidth - 8);
+            doc.text(linesOXH, leftMargin + 4, heliContentY);
+            heliContentY += (linesOXH.length * 4.5) + 3;
+        }
+    }
+    
+    if (heliOXI) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.text('LN-OXI', leftMargin + 4, heliContentY);
+        heliContentY += 5.5;
+        
+        if (heliOXIStatus) {
+            drawStatusBadge(heliOXIStatus, leftMargin + 4, heliContentY);
+            heliContentY += 7;
+        }
+        
+        if (heliOXIText) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const linesOXI = doc.splitTextToSize(heliOXIText, contentWidth - 8);
+            doc.text(linesOXI, leftMargin + 4, heliContentY);
+            heliContentY += (linesOXI.length * 4.5) + 3;
+        }
+    }
+    
+    if (heliOXJ) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.text('LN-OXJ', leftMargin + 4, heliContentY);
+        heliContentY += 5.5;
+        
+        if (heliOXJStatus) {
+            drawStatusBadge(heliOXJStatus, leftMargin + 4, heliContentY);
+            heliContentY += 7;
+        }
+        
+        if (heliOXJText) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const linesOXJ = doc.splitTextToSize(heliOXJText, contentWidth - 8);
+            doc.text(linesOXJ, leftMargin + 4, heliContentY);
+            heliContentY += (linesOXJ.length * 4.5) + 3;
+        }
+    }
+    
+    if (heliOXK) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.text('LN-OXK', leftMargin + 4, heliContentY);
+        heliContentY += 5.5;
+        
+        if (heliOXKStatus) {
+            drawStatusBadge(heliOXKStatus, leftMargin + 4, heliContentY);
+            heliContentY += 7;
+        }
+        
+        if (heliOXKText) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const linesOXK = doc.splitTextToSize(heliOXKText, contentWidth - 8);
+            doc.text(linesOXK, leftMargin + 4, heliContentY);
+            heliContentY += (linesOXK.length * 4.5) + 3;
+        }
+    }
+    
+    if (!heliOXH && !heliOXI && !heliOXJ && !heliOXK) {
+        doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+        doc.text('(Ingen helikoptre valgt)', leftMargin + 4, heliContentY);
+    }
+    
+    yPos = heliCardY + heliCardHeight + 6;
+    
+    // Add uploaded files/attachments
+    if (files && files.length > 0) {
+        // Check if we need a new page
+        if (yPos > pageHeight - bottomMargin - 30) {
+            doc.addPage();
+            yPos = topMargin;
+        }
+        
+        yPos += 5;
+        
+        // Vedlegg Card Section
+        const vedleggCardY = yPos;
+        
+        // Section title (outside card)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryBlueDark[0], primaryBlueDark[1], primaryBlueDark[2]);
+        doc.text('Vedlegg', leftMargin, vedleggCardY);
+        yPos += 8;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+        
+        files.forEach((file, index) => {
+            // Check if we need a new page
+            if (yPos > pageHeight - bottomMargin - 30) {
+                doc.addPage();
+                yPos = topMargin;
+            }
+            
+            if (file.isImage && file.data) {
+                try {
+                    // Add image to PDF (use full content width)
+                    const imgWidth = contentWidth;
+                    const imgHeight = (imgWidth * 0.75); // Maintain aspect ratio (approximate)
+                    
+                    // Check if image fits on current page
+                    if (yPos + imgHeight > pageHeight - bottomMargin) {
+                        doc.addPage();
+                        yPos = topMargin;
+                    }
+                    
+                    // Add image with border
+                    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+                    doc.setLineWidth(0.3);
+                    doc.rect(leftMargin - 1, yPos - 1, imgWidth + 2, imgHeight + 2, 'S');
+                    
+                    doc.addImage(file.data, 'JPEG', leftMargin, yPos, imgWidth, imgHeight);
+                    yPos += imgHeight + 5;
+                    
+                    // Add filename below image with card style
+                    doc.setFillColor(bgSecondary[0], bgSecondary[1], bgSecondary[2]);
+                    doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+                    doc.setLineWidth(0.3);
+                    const filenameBoxHeight = 5;
+                    if (typeof doc.roundedRect === 'function') {
+                        doc.roundedRect(leftMargin, yPos, contentWidth, filenameBoxHeight, 1, 1, 'FD');
+                    } else {
+                        doc.rect(leftMargin, yPos, contentWidth, filenameBoxHeight, 'FD');
+                    }
+                    
+                    doc.setFontSize(8);
+                    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(file.name, leftMargin + 3, yPos + 3.5);
+                    yPos += filenameBoxHeight + 4;
+                    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+                    doc.setFontSize(9);
+                } catch (error) {
+                    console.error('Error adding image to PDF:', error);
+                    doc.text(`${file.name} (kunne ikke legges til)`, leftMargin, yPos);
+                    yPos += 5.5;
+                }
+            } else {
+                // PDF file or other - display in card style
+                doc.setFillColor(bgSecondary[0], bgSecondary[1], bgSecondary[2]);
+                doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+                doc.setLineWidth(0.3);
+                if (typeof doc.roundedRect === 'function') {
+                    doc.roundedRect(leftMargin, yPos - 3, contentWidth, 6, 1, 1, 'FD');
+                } else {
+                    doc.rect(leftMargin, yPos - 3, contentWidth, 6, 'FD');
+                }
+                
+                doc.setFontSize(9);
+                doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`📄 ${file.name}`, leftMargin + 3, yPos);
+                yPos += 7;
+            }
+        });
+    }
+    
+    // Generate filename with base, vakttype and date
+    const sanitizedBase = sanitizeForFilename(base || 'Ukjent');
+    const sanitizedVakttype = sanitizeForFilename(vakttype || 'Ukjent');
+    const formattedDate = formatDateForFilename(date);
+    const filename = `Vaktrapport_${sanitizedBase}_${sanitizedVakttype}_${formattedDate}.pdf`;
+    
+    // Save report data to register
+    const reportData = {
+        date: date,
+        base: base,
+        vakttype: vakttype,
+        person: person,
+        statusBase: statusBase,
+        filePath: filePath,
+        kaffi: kaffiChecked,
+        fuelTraktor: fuelTraktorChecked,
+        vaskeGulv: vaskeGulvChecked,
+        tommeBoss: tommeBossChecked,
+        heliOXH: heliOXH,
+        heliOXHText: heliOXHText,
+        heliOXHStatus: heliOXHStatus,
+        heliOXI: heliOXI,
+        heliOXIText: heliOXIText,
+        heliOXIStatus: heliOXIStatus,
+        heliOXJ: heliOXJ,
+        heliOXJText: heliOXJText,
+        heliOXJStatus: heliOXJStatus,
+        heliOXK: heliOXK,
+        heliOXKText: heliOXKText,
+        heliOXKStatus: heliOXKStatus,
+        timestamp: new Date().toISOString()
+    };
+    saveReportToRegister(reportData);
+    
+    // Add footer to all pages
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        // Footer background
+        const footerY = pageHeight - 6;
+        doc.setFillColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.rect(0, footerY, pageWidth, 6, 'F');
+        
+        // Footer text
+        doc.setFontSize(6);
+        doc.setTextColor(200, 200, 200);
+        doc.setFont('helvetica', 'normal');
+        const footerText = `Side ${i} av ${pageCount} | Generert ${new Date().toLocaleString('no-NO', { dateStyle: 'short', timeStyle: 'short' })}`;
+        doc.text(footerText, pageWidth / 2, footerY + 4, { align: 'center' });
+        
+        // Footer line
+        doc.setDrawColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+        doc.setLineWidth(0.3);
+        doc.line(0, footerY, pageWidth, footerY);
+    }
+    
+    // Save PDF
+    doc.save(filename);
+}
+
+function formatDate(dateString) {
+    if (!dateString || dateString === 'Ikke angitt') {
+        return 'Ikke angitt';
+    }
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString('no-NO', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+function formatDateForFilename(dateString) {
+    if (!dateString || dateString === 'Ikke angitt') {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+    // Convert YYYY-MM-DD to DD-MM-YYYY
+    const dateParts = dateString.split('-');
+    if (dateParts.length === 3) {
+        return `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+    }
+    return dateString;
+}
+
+function sanitizeForFilename(text) {
+    if (!text) return 'Ukjent';
+    // Replace spaces and special characters with underscores
+    // Remove or replace characters that are not safe for filenames
+    return text
+        .replace(/[^a-zA-Z0-9æøåÆØÅ]/g, '_') // Replace special chars with underscore
+        .replace(/_+/g, '_') // Replace multiple underscores with single
+        .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+}
