@@ -97,6 +97,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (helicopterId === 'heliOXH') {
             textFieldId = 'heliOXHText';
             statusDivId = 'heliOXHStatus';
+        } else if (helicopterId === 'heliOXB') {
+            textFieldId = 'heliOXBText';
+            statusDivId = 'heliOXBStatus';
         } else if (helicopterId === 'heliOXI') {
             textFieldId = 'heliOXIText';
             statusDivId = 'heliOXIStatus';
@@ -124,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
             statusDiv.style.display = 'flex';
             textField.removeAttribute('disabled');
             textField.disabled = false;
+            textField.style.display = '';
             // Focus after a short delay
             setTimeout(() => {
                 textField.focus();
@@ -134,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
             textField.disabled = true;
             textField.setAttribute('disabled', 'disabled');
             textField.value = '';
+            textField.style.display = 'none';
             // Clear status radio selections
             const statusRadios = statusDiv.querySelectorAll('input[type="radio"]');
             statusRadios.forEach(radio => {
@@ -149,6 +154,8 @@ document.addEventListener('DOMContentLoaded', function() {
         checkbox.addEventListener('change', function() {
             handleHelicopterChange(this);
         });
+        // Sett initial visning ved last av side
+        handleHelicopterChange(checkbox);
     });
 
     // PDF Export functionality
@@ -162,7 +169,22 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedPersons = [];
     
     // All available persons in the dropdown
-    const allAvailablePersons = ['Marius Høvik', 'Torfinn Roti', 'Eirik Dypevik', 'Johnny Mæland', 'Håvard Adsen', 'Odd Fiksdal', 'Johan Karlsson', 'Leif Rune Krogh Hus', 'Stig Hestad', 'Jøran Festervoll', 'Elliot Jaako'];
+    const allAvailablePersons = [
+        'Marius Høvik',
+        'Torfinn Roti',
+        'Eirik Dypevik',
+        'Johnny Mæland',
+        'Håvard Adsen',
+        'Odd Fiksdal',
+        'Johan Karlsson',
+        'Leif Rune Krogh Hus',
+        'Stig Hestad',
+        'Jøran Festervoll',
+        'Elliot Jaako',
+        'Gustav Svanstrøm',
+        'Andreas Valø',
+        'Luigino Visintini'
+    ];
     
     // Update dropdown options to exclude selected persons
     function updatePersonDropdown() {
@@ -541,7 +563,22 @@ function loadReport(index) {
         // Load person selections
         if (report.person) {
             const personNames = report.person.split(',').map(n => n.trim()).filter(n => n);
-            const knownNames = ['Marius Høvik', 'Torfinn Roti', 'Eirik Dypevik', 'Johnny Mæland', 'Håvard Adsen', 'Odd Fiksdal', 'Johan Karlsson', 'Leif Rune Krogh Hus', 'Stig Hestad', 'Jøran Festervoll', 'Elliot Jaako'];
+            const knownNames = [
+                'Marius Høvik',
+                'Torfinn Roti',
+                'Eirik Dypevik',
+                'Johnny Mæland',
+                'Håvard Adsen',
+                'Odd Fiksdal',
+                'Johan Karlsson',
+                'Leif Rune Krogh Hus',
+                'Stig Hestad',
+                'Jøran Festervoll',
+                'Elliot Jaako',
+                'Gustav Svanstrøm',
+                'Andreas Valø',
+                'Luigino Visintini'
+            ];
             const extraNames = [];
             
             // Clear previous selections
@@ -578,6 +615,7 @@ function loadReport(index) {
         document.getElementById('kaffi').checked = report.kaffi || false;
         document.getElementById('fuelTraktor').checked = report.fuelTraktor || false;
         document.getElementById('vaskeGulv').checked = report.vaskeGulv || false;
+        document.getElementById('vaskeHelikopter').checked = report.vaskeHelikopter || false;
         document.getElementById('tommeBoss').checked = report.tommeBoss || false;
         
         document.getElementById('heliOXH').checked = report.heliOXH || false;
@@ -588,6 +626,18 @@ function loadReport(index) {
             heliOXHStatusDiv.style.display = report.heliOXH ? 'flex' : 'none';
             if (report.heliOXHStatus) {
                 const statusRadio = document.querySelector(`input[name="heliOXHStatus"][value="${report.heliOXHStatus}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+        }
+        
+        document.getElementById('heliOXB').checked = report.heliOXB || false;
+        document.getElementById('heliOXBText').value = report.heliOXBText || '';
+        document.getElementById('heliOXBText').disabled = !report.heliOXB;
+        const heliOXBStatusDiv = document.getElementById('heliOXBStatus');
+        if (heliOXBStatusDiv) {
+            heliOXBStatusDiv.style.display = report.heliOXB ? 'flex' : 'none';
+            if (report.heliOXBStatus) {
+                const statusRadio = document.querySelector(`input[name="heliOXBStatus"][value="${report.heliOXBStatus}"]`);
                 if (statusRadio) statusRadio.checked = true;
             }
         }
@@ -666,7 +716,6 @@ function generatePDF() {
     if (!base) missingFields.push('Base');
     if (!vakttype) missingFields.push('Vakttype');
     if (!person) missingFields.push('Personer involvert');
-    if (!statusBase) missingFields.push('Status base');
     
     if (missingFields.length > 0) {
         alert('Vennligst fyll ut alle påkrevde felt:\n\n' + missingFields.join('\n'));
@@ -696,12 +745,17 @@ function generatePDF() {
         const doc = new jsPDF('p', 'mm', 'a4');
         
         // Get form values (already validated above)
-        const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover\\LOS Bergen';
+        const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover';
         
         const heliOXH = document.getElementById('heliOXH').checked;
         const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
         const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
         const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
+        
+        const heliOXB = document.getElementById('heliOXB').checked;
+        const heliOXBText = heliOXB ? document.getElementById('heliOXBText').value : '';
+        const heliOXBStatusRadio = heliOXB ? document.querySelector('input[name="heliOXBStatus"]:checked') : null;
+        const heliOXBStatus = heliOXBStatusRadio ? heliOXBStatusRadio.value : '';
         
         const heliOXI = document.getElementById('heliOXI').checked;
         const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
@@ -722,8 +776,11 @@ function generatePDF() {
         const files = window.uploadedFiles || [];
         
         generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath, 
-            heliOXH, heliOXHText, heliOXHStatus, heliOXI, heliOXIText, heliOXIStatus, 
-            heliOXJ, heliOXJText, heliOXJStatus, heliOXK, heliOXKText, heliOXKStatus, files, logoInfo);
+            heliOXH, heliOXHText, heliOXHStatus,
+            heliOXB, heliOXBText, heliOXBStatus,
+            heliOXI, heliOXIText, heliOXIStatus, 
+            heliOXJ, heliOXJText, heliOXJStatus,
+            heliOXK, heliOXKText, heliOXKStatus, files, logoInfo);
     };
     logoImg.onerror = function() {
         // If logo fails to load, continue without it
@@ -731,12 +788,17 @@ function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
         
-        const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover\\LOS Bergen';
+        const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover';
         
         const heliOXH = document.getElementById('heliOXH').checked;
         const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
         const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
         const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
+        
+        const heliOXB = document.getElementById('heliOXB').checked;
+        const heliOXBText = heliOXB ? document.getElementById('heliOXBText').value : '';
+        const heliOXBStatusRadio = heliOXB ? document.querySelector('input[name="heliOXBStatus"]:checked') : null;
+        const heliOXBStatus = heliOXBStatusRadio ? heliOXBStatusRadio.value : '';
         
         const heliOXI = document.getElementById('heliOXI').checked;
         const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
@@ -756,15 +818,21 @@ function generatePDF() {
         const files = window.uploadedFiles || [];
         
         generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath, 
-            heliOXH, heliOXHText, heliOXHStatus, heliOXI, heliOXIText, heliOXIStatus, 
-            heliOXJ, heliOXJText, heliOXJStatus, heliOXK, heliOXKText, heliOXKStatus, files, null);
+            heliOXH, heliOXHText, heliOXHStatus,
+            heliOXB, heliOXBText, heliOXBStatus,
+            heliOXI, heliOXIText, heliOXIStatus, 
+            heliOXJ, heliOXJText, heliOXJStatus,
+            heliOXK, heliOXKText, heliOXKStatus, files, null);
     };
     logoImg.src = 'assets/airliftlogo.webp';
 }
 
 function generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath,
-    heliOXH, heliOXHText, heliOXHStatus, heliOXI, heliOXIText, heliOXIStatus,
-    heliOXJ, heliOXJText, heliOXJStatus, heliOXK, heliOXKText, heliOXKStatus, files = [], logoInfo = null) {
+    heliOXH, heliOXHText, heliOXHStatus,
+    heliOXB, heliOXBText, heliOXBStatus,
+    heliOXI, heliOXIText, heliOXIStatus,
+    heliOXJ, heliOXJText, heliOXJStatus,
+    heliOXK, heliOXKText, heliOXKStatus, files = [], logoInfo = null) {
     
     // Website Design System Colors - Aviation Inspired
     const primaryBlue = [30, 136, 229]; // #1E88E5 - Sky Blue
@@ -1026,6 +1094,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     const kaffiChecked = document.getElementById('kaffi').checked;
     const fuelTraktorChecked = document.getElementById('fuelTraktor').checked;
     const vaskeGulvChecked = document.getElementById('vaskeGulv').checked;
+    const vaskeHelikopterChecked = document.getElementById('vaskeHelikopter').checked;
     const tommeBossChecked = document.getElementById('tommeBoss').checked;
     
     // Two-column layout
@@ -1043,6 +1112,10 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     // Row 2
     drawCheckboxItem('Vaske gulv', vaskeGulvChecked, checkboxColumn1X, checkboxY);
     drawCheckboxItem('Tømme boss', tommeBossChecked, checkboxColumn2X, checkboxY);
+    checkboxY += checkboxRowHeight;
+    
+    // Row 3
+    drawCheckboxItem('Vaske helikopter', vaskeHelikopterChecked, checkboxColumn1X, checkboxY);
     
     yPos = kontrollCardY + kontrollCardHeight + 6;
     
@@ -1057,6 +1130,13 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         totalHeliHeight += 14;
         if (heliOXHText) {
             const lines = doc.splitTextToSize(heliOXHText || '', contentWidth - 12);
+            totalHeliHeight += lines.length * 4.5;
+        }
+    }
+    if (heliOXB) {
+        totalHeliHeight += 14;
+        if (heliOXBText) {
+            const lines = doc.splitTextToSize(heliOXBText || '', contentWidth - 12);
             totalHeliHeight += lines.length * 4.5;
         }
     }
@@ -1081,7 +1161,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
             totalHeliHeight += lines.length * 4.5;
         }
     }
-    if (!heliOXH && !heliOXI && !heliOXJ && !heliOXK) {
+    if (!heliOXH && !heliOXB && !heliOXI && !heliOXJ && !heliOXK) {
         totalHeliHeight += 8;
     }
     heliCardHeight = Math.max(totalHeliHeight, 22);
@@ -1159,6 +1239,28 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         }
     }
     
+    if (heliOXB) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.text('LN-OXB', leftMargin + 4, heliContentY);
+        heliContentY += 5.5;
+        
+        if (heliOXBStatus) {
+            drawStatusBadge(heliOXBStatus, leftMargin + 4, heliContentY);
+            heliContentY += 7;
+        }
+        
+        if (heliOXBText) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const linesOXB = doc.splitTextToSize(heliOXBText, contentWidth - 8);
+            doc.text(linesOXB, leftMargin + 4, heliContentY);
+            heliContentY += (linesOXB.length * 4.5) + 3;
+        }
+    }
+    
     if (heliOXI) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -1225,7 +1327,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         }
     }
     
-    if (!heliOXH && !heliOXI && !heliOXJ && !heliOXK) {
+    if (!heliOXH && !heliOXB && !heliOXI && !heliOXJ && !heliOXK) {
         doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
         doc.text('(Ingen helikoptre valgt)', leftMargin + 4, heliContentY);
     }
@@ -1343,10 +1445,14 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         kaffi: kaffiChecked,
         fuelTraktor: fuelTraktorChecked,
         vaskeGulv: vaskeGulvChecked,
+        vaskeHelikopter: vaskeHelikopterChecked,
         tommeBoss: tommeBossChecked,
         heliOXH: heliOXH,
         heliOXHText: heliOXHText,
         heliOXHStatus: heliOXHStatus,
+        heliOXB: heliOXB,
+        heliOXBText: heliOXBText,
+        heliOXBStatus: heliOXBStatus,
         heliOXI: heliOXI,
         heliOXIText: heliOXIText,
         heliOXIStatus: heliOXIStatus,

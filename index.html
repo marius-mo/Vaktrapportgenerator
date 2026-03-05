@@ -12,8 +12,15 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <script>
+        (function () {
+            if (!sessionStorage.getItem('vaktrapport_auth')) {
+                window.location.href = 'login.html';
+            }
+        })();
+    </script>
     <div class="container">
-        <div class="filepath-header">Sharepoint: \Technical - Part-145\Planning\Status reports - Handover\LOS Bergen</div>
+        <div class="filepath-header">Sharepoint: \Technical - Part-145\Planning\Status reports - Handover</div>
         <header>
             <h1 id="reportTitle">Vaktrapport</h1>
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -72,6 +79,9 @@
                                 <option value="Stig Hestad">Stig Hestad</option>
                                 <option value="Jøran Festervoll">Jøran Festervoll</option>
                                 <option value="Elliot Jaako">Elliot Jaako</option>
+                                <option value="Gustav Svanstrøm">Gustav Svanstrøm</option>
+                                <option value="Andreas Valø">Andreas Valø</option>
+                                <option value="Luigino Visintini">Luigino Visintini</option>
                             </select>
                             <input type="text" id="personExtra" name="personExtra" placeholder="Andre navn (kommaseparert)">
                         </div>
@@ -84,7 +94,7 @@
 
                 <div class="form-group">
                     <label for="statusBase">Status base:</label>
-                    <textarea id="statusBase" name="statusBase" required></textarea>
+                    <textarea id="statusBase" name="statusBase"></textarea>
                 </div>
 
                 <div class="form-group">
@@ -119,6 +129,26 @@
                             </div>
                         </div>
                         <textarea id="heliOXHText" name="heliOXHText" class="helicopter-text" placeholder="Skriv her..." disabled></textarea>
+                    </div>
+
+                    <div class="helicopter-item">
+                        <div class="helicopter-header">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="heliOXB" name="heliOXB" class="helicopter-checkbox">
+                                <span>LN-OXB</span>
+                            </label>
+                            <div class="helicopter-status" id="heliOXBStatus" style="display: none;">
+                                <label class="status-label status-serviceable">
+                                    <input type="radio" name="heliOXBStatus" value="SERVICEABLE" id="heliOXBServiceable">
+                                    <span>SERVICEABLE</span>
+                                </label>
+                                <label class="status-label status-unserviceable">
+                                    <input type="radio" name="heliOXBStatus" value="UNSERVICEABLE" id="heliOXBUnserviceable">
+                                    <span>UNSERVICEABLE</span>
+                                </label>
+                            </div>
+                        </div>
+                        <textarea id="heliOXBText" name="heliOXBText" class="helicopter-text" placeholder="Skriv her..." disabled></textarea>
                     </div>
 
                     <div class="helicopter-item">
@@ -200,6 +230,11 @@
                         <input type="checkbox" id="vaskeGulv" name="vaskeGulv">
                         <span class="checkbox-custom"></span>
                         <span class="checkbox-text">Vaske gulv</span>
+                    </label>
+                    <label class="checkbox-label kontrollpunkt-item">
+                        <input type="checkbox" id="vaskeHelikopter" name="vaskeHelikopter">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Vaske helikopter</span>
                     </label>
                     <label class="checkbox-label kontrollpunkt-item">
                         <input type="checkbox" id="tommeBoss" name="tommeBoss">
