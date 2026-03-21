@@ -1423,117 +1423,52 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+        return badgeWidth;
+    };
+
+    const drawHeliStatusAndText = (titleText, status, text) => {
+        const titleY = heliContentY;
+
+        if (status) {
+            const badgeX = leftMargin + 4 + doc.getTextWidth(titleText) + 6;
+            drawStatusBadge(status, badgeX, titleY);
+        }
+
+        heliContentY += 5.5;
+
+        if (text) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const lines = doc.splitTextToSize(text, contentWidth - 8);
+            doc.text(lines, leftMargin + 4, heliContentY);
+            heliContentY += (lines.length * 4.5) + 3;
+        } else if (status) {
+            heliContentY += 2;
+        }
     };
     
-    if (heliOXH) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text('LN-OXH', leftMargin + 4, heliContentY);
-        heliContentY += 5.5;
-        
-        if (heliOXHStatus) {
-            drawStatusBadge(heliOXHStatus, leftMargin + 4, heliContentY);
-            heliContentY += 7;
-        }
-        
-        if (heliOXHText) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
-            const linesOXH = doc.splitTextToSize(heliOXHText, contentWidth - 8);
-            doc.text(linesOXH, leftMargin + 4, heliContentY);
-            heliContentY += (linesOXH.length * 4.5) + 3;
-        }
-    }
-    
-    if (heliOXI) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text('LN-OXI', leftMargin + 4, heliContentY);
-        heliContentY += 5.5;
-        
-        if (heliOXIStatus) {
-            drawStatusBadge(heliOXIStatus, leftMargin + 4, heliContentY);
-            heliContentY += 7;
-        }
-        
-        if (heliOXIText) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
-            const linesOXI = doc.splitTextToSize(heliOXIText, contentWidth - 8);
-            doc.text(linesOXI, leftMargin + 4, heliContentY);
-            heliContentY += (linesOXI.length * 4.5) + 3;
-        }
-    }
-    
-    if (heliOXJ) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text('LN-OXJ', leftMargin + 4, heliContentY);
-        heliContentY += 5.5;
-        
-        if (heliOXJStatus) {
-            drawStatusBadge(heliOXJStatus, leftMargin + 4, heliContentY);
-            heliContentY += 7;
-        }
-        
-        if (heliOXJText) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
-            const linesOXJ = doc.splitTextToSize(heliOXJText, contentWidth - 8);
-            doc.text(linesOXJ, leftMargin + 4, heliContentY);
-            heliContentY += (linesOXJ.length * 4.5) + 3;
-        }
-    }
-    
-    if (heliOXK) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text('LN-OXK', leftMargin + 4, heliContentY);
-        heliContentY += 5.5;
-        
-        if (heliOXKStatus) {
-            drawStatusBadge(heliOXKStatus, leftMargin + 4, heliContentY);
-            heliContentY += 7;
-        }
-        
-        if (heliOXKText) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
-            const linesOXK = doc.splitTextToSize(heliOXKText, contentWidth - 8);
-            doc.text(linesOXK, leftMargin + 4, heliContentY);
-            heliContentY += (linesOXK.length * 4.5) + 3;
-        }
-    }
+    const selectedHelicopters = [];
+    if (heliOXH) selectedHelicopters.push({ title: 'LN-OXH', status: heliOXHStatus, text: heliOXHText });
+    if (heliOXI) selectedHelicopters.push({ title: 'LN-OXI', status: heliOXIStatus, text: heliOXIText });
+    if (heliOXJ) selectedHelicopters.push({ title: 'LN-OXJ', status: heliOXJStatus, text: heliOXJText });
+    if (heliOXK) selectedHelicopters.push({ title: 'LN-OXK', status: heliOXKStatus, text: heliOXKText });
+    if (heliOXB) selectedHelicopters.push({ title: 'LN-OBX', status: heliOXBStatus, text: heliOXBText });
 
-    if (heliOXB) {
+    selectedHelicopters.forEach((helicopter, index) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text('LN-OBX', leftMargin + 4, heliContentY);
-        heliContentY += 5.5;
-        
-        if (heliOXBStatus) {
-            drawStatusBadge(heliOXBStatus, leftMargin + 4, heliContentY);
-            heliContentY += 7;
+        doc.text(helicopter.title, leftMargin + 4, heliContentY);
+        drawHeliStatusAndText(helicopter.title, helicopter.status, helicopter.text);
+
+        if (index < selectedHelicopters.length - 1) {
+            doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+            doc.setLineWidth(0.3);
+            doc.line(leftMargin + 4, heliContentY, leftMargin + contentWidth - 4, heliContentY);
+            heliContentY += 4;
         }
-        
-        if (heliOXBText) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
-            const linesOXB = doc.splitTextToSize(heliOXBText, contentWidth - 8);
-            doc.text(linesOXB, leftMargin + 4, heliContentY);
-            heliContentY += (linesOXB.length * 4.5) + 3;
-        }
-    }
+    });
     
     if (!heliOXH && !heliOXB && !heliOXI && !heliOXJ && !heliOXK) {
         doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
