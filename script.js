@@ -610,7 +610,7 @@ function loadReport(index) {
                 window.updatePersonDropdown();
             }
         }
-        if (report.statusBase) document.getElementById('statusBase').value = report.statusBase;
+        document.getElementById('statusBase').value = report.statusBase || '';
         
         document.getElementById('kaffi').checked = report.kaffi || false;
         document.getElementById('fuelTraktor').checked = report.fuelTraktor || false;
@@ -621,6 +621,7 @@ function loadReport(index) {
         document.getElementById('heliOXH').checked = report.heliOXH || false;
         document.getElementById('heliOXHText').value = report.heliOXHText || '';
         document.getElementById('heliOXHText').disabled = !report.heliOXH;
+        document.getElementById('heliOXHText').style.display = report.heliOXH ? '' : 'none';
         const heliOXHStatusDiv = document.getElementById('heliOXHStatus');
         if (heliOXHStatusDiv) {
             heliOXHStatusDiv.style.display = report.heliOXH ? 'flex' : 'none';
@@ -633,6 +634,7 @@ function loadReport(index) {
         document.getElementById('heliOXB').checked = report.heliOXB || false;
         document.getElementById('heliOXBText').value = report.heliOXBText || '';
         document.getElementById('heliOXBText').disabled = !report.heliOXB;
+        document.getElementById('heliOXBText').style.display = report.heliOXB ? '' : 'none';
         const heliOXBStatusDiv = document.getElementById('heliOXBStatus');
         if (heliOXBStatusDiv) {
             heliOXBStatusDiv.style.display = report.heliOXB ? 'flex' : 'none';
@@ -645,6 +647,7 @@ function loadReport(index) {
         document.getElementById('heliOXI').checked = report.heliOXI || false;
         document.getElementById('heliOXIText').value = report.heliOXIText || '';
         document.getElementById('heliOXIText').disabled = !report.heliOXI;
+        document.getElementById('heliOXIText').style.display = report.heliOXI ? '' : 'none';
         const heliOXIStatusDiv = document.getElementById('heliOXIStatus');
         if (heliOXIStatusDiv) {
             heliOXIStatusDiv.style.display = report.heliOXI ? 'flex' : 'none';
@@ -657,6 +660,7 @@ function loadReport(index) {
         document.getElementById('heliOXJ').checked = report.heliOXJ || false;
         document.getElementById('heliOXJText').value = report.heliOXJText || '';
         document.getElementById('heliOXJText').disabled = !report.heliOXJ;
+        document.getElementById('heliOXJText').style.display = report.heliOXJ ? '' : 'none';
         const heliOXJStatusDiv = document.getElementById('heliOXJStatus');
         if (heliOXJStatusDiv) {
             heliOXJStatusDiv.style.display = report.heliOXJ ? 'flex' : 'none';
@@ -669,6 +673,7 @@ function loadReport(index) {
         document.getElementById('heliOXK').checked = report.heliOXK || false;
         document.getElementById('heliOXKText').value = report.heliOXKText || '';
         document.getElementById('heliOXKText').disabled = !report.heliOXK;
+        document.getElementById('heliOXKText').style.display = report.heliOXK ? '' : 'none';
         const heliOXKStatusDiv = document.getElementById('heliOXKStatus');
         if (heliOXKStatusDiv) {
             heliOXKStatusDiv.style.display = report.heliOXK ? 'flex' : 'none';
