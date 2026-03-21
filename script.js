@@ -530,6 +530,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const reportForm = document.getElementById('reportForm');
     reportForm.addEventListener('reset', function() {
         setTimeout(() => {
+            clearLoadedDraftMeta();
             reportTitle.textContent = 'Vaktrapport';
             setDateToToday();
             // Hide all helicopter status fields
@@ -585,6 +586,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Store and retrieve reports: Firestore (felles) eller localStorage (lokal fallback)
+window.loadedDraftMeta = null;
+
 function saveReportToRegister(reportData) {
     if (window.firestoreDb) {
         window.firestoreDb.collection('vaktrapporter').add(reportData)
@@ -600,6 +603,46 @@ function saveReportToRegister(reportData) {
     if (reports.length > 50) reports = reports.slice(0, 50);
     localStorage.setItem('vaktrapport_reports', JSON.stringify(reports));
     loadReportRegister();
+}
+
+function clearLoadedDraftMeta() {
+    window.loadedDraftMeta = null;
+}
+
+function removeLoadedDraftIfAny() {
+    var meta = window.loadedDraftMeta;
+    if (!meta || !meta.isDraft) return;
+
+    if (window.firestoreDb && meta.id) {
+        window.firestoreDb.collection('vaktrapporter').doc(meta.id).delete()
+            .then(function() {
+                clearLoadedDraftMeta();
+                loadReportRegister();
+            })
+            .catch(function(err) {
+                console.error('Firestore delete loaded draft error:', err);
+            });
+        return;
+    }
+
+    var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
+    var draftIndex = -1;
+
+    if (typeof meta.index === 'number' && reports[meta.index] && reports[meta.index].isDraft) {
+        draftIndex = meta.index;
+    } else if (meta.timestamp) {
+        draftIndex = reports.findIndex(function(report) {
+            return !!report.isDraft && report.timestamp === meta.timestamp;
+        });
+    }
+
+    if (draftIndex !== -1) {
+        reports.splice(draftIndex, 1);
+        localStorage.setItem('vaktrapport_reports', JSON.stringify(reports));
+        loadReportRegister();
+    }
+
+    clearLoadedDraftMeta();
 }
 
 function collectCurrentReportData(isDraft) {
@@ -783,6 +826,12 @@ function loadReport(index) {
     var reports = window.vaktrapportDocsList || [];
     if (index < 0 || index >= reports.length) return;
     var report = reports[index];
+    window.loadedDraftMeta = {
+        isDraft: !!report.isDraft,
+        id: report.id || null,
+        index: index,
+        timestamp: report.timestamp || null
+    };
         
         // Populate form with report data
         setDateToToday();
@@ -1610,6 +1659,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     };
     if (shouldSaveToRegister) {
         saveReportToRegister(reportData);
+        removeLoadedDraftIfAny();
     }
     
     // Add footer to all pages
