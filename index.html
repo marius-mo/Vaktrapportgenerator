@@ -245,9 +245,20 @@
             </div>
 
             <div class="form-actions">
-                <button type="button" id="exportPdf" class="btn btn-primary">Eksporter til PDF</button>
-                <button type="reset" class="btn btn-secondary">Nullstill skjema</button>
+                <button type="button" id="exportPdf" class="btn btn-success">Eksporter til PDF</button>
+                <button type="button" id="sendEmail" class="btn btn-neutral" disabled>Send e-post</button>
+                <a
+                    id="openSharepointMappe"
+                    href="https://airliftas.sharepoint.com/:f:/r/sites/Technical/Shared%20Documents/Part-145/Planning/Status%20reports%20-%20Handover?csf=1&web=1&e=c1DCC7"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-neutral btn-link is-disabled"
+                    aria-disabled="true"
+                    tabindex="-1"
+                >Åpne SharePoint-mappe</a>
+                <button type="reset" class="btn btn-danger">Nullstill skjema</button>
             </div>
+            <p class="form-actions-note">Tips: Eksporter PDF først, og legg den ved manuelt i e-posten som åpnes.</p>
         </form>
 
         <div class="register-section">

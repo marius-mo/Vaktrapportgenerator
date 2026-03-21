@@ -146,6 +146,27 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+    // Bruk samme UI-logikk ved lasting av rapport som ved manuell avhuking.
+    window.applyLoadedHelicopterState = function(heliId, isChecked, notes, statusValue) {
+        const checkbox = document.getElementById(heliId);
+        if (!checkbox) return;
+
+        checkbox.checked = !!isChecked;
+        handleHelicopterChange(checkbox);
+
+        const textField = document.getElementById(heliId + 'Text');
+        const statusDiv = document.getElementById(heliId + 'Status');
+        if (!textField || !statusDiv) return;
+
+        if (checkbox.checked) {
+            textField.value = notes || '';
+            if (statusValue) {
+                const statusRadio = statusDiv.querySelector(`input[value="${statusValue}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+        }
+    };
     
     // Add event listeners to all helicopter checkboxes
     const helicopterCheckboxes = document.querySelectorAll('.helicopter-checkbox');
@@ -160,8 +181,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // PDF Export functionality
     const exportPdfBtn = document.getElementById('exportPdf');
+    const sharepointBtn = document.getElementById('openSharepointMappe');
+    const sendEmailBtn = document.getElementById('sendEmail');
     exportPdfBtn.addEventListener('click', function() {
         generatePDF();
+    });
+
+    // E-mail shortcut with prefilled recipients/subject/body
+    if (sendEmailBtn) {
+        sendEmailBtn.addEventListener('click', function () {
+            const base = (document.getElementById('base').value || 'Ikke angitt').trim();
+            const vakttype = (document.getElementById('vakttype').value || 'Ikke angitt').trim();
+            const date = (document.getElementById('date').value || '').trim();
+
+            const formattedDate = date || 'Ikke angitt';
+            const subject = `Statusrapport ${base} ${vakttype} ${formattedDate}`;
+            const body = `Hei,\n\nSe vedlagt vaktrapport.\n\nGod vakt 😊`;
+
+            const toRecipients = [
+                'AL_Teknikere-LOS@airlift.no',
+                'camo.aw169@airlift.no',
+                'JornErik.Sorensen@airlift.no',
+                'karianne.blom@airlift.no',
+                'basetekniker-flesland@airlift.no',
+                'asgeir.hogstad@airlift.no'
+            ].join(',');
+
+            const mailtoUrl =
+                `mailto:${encodeURIComponent(toRecipients)}` +
+                `?subject=${encodeURIComponent(subject)}` +
+                `&body=${encodeURIComponent(body)}`;
+
+            // Etter e-post åpnes, marker SharePoint-knapp som neste steg.
+            if (sharepointBtn) {
+                sharepointBtn.classList.remove('btn-neutral');
+                sharepointBtn.classList.add('btn-success');
+                sharepointBtn.classList.remove('is-disabled');
+                sharepointBtn.removeAttribute('aria-disabled');
+                sharepointBtn.removeAttribute('tabindex');
+            }
+
+            window.location.href = mailtoUrl;
+        });
+    }
+
+    // Når PDF faktisk er eksportert, marker e-postknappen som grønn.
+    window.addEventListener('vaktrapport:pdfExported', function () {
+        if (sendEmailBtn) {
+            sendEmailBtn.classList.remove('btn-neutral');
+            sendEmailBtn.classList.add('btn-success');
+            sendEmailBtn.disabled = false;
+        }
     });
 
 
@@ -472,6 +542,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.updateUploadedFilesDisplay) {
                 window.updateUploadedFilesDisplay();
             }
+            // Nullstill steg-farger for prosessknapper.
+            if (sendEmailBtn) {
+                sendEmailBtn.classList.remove('btn-success');
+                sendEmailBtn.classList.add('btn-neutral');
+                sendEmailBtn.disabled = true;
+            }
+            if (sharepointBtn) {
+                sharepointBtn.classList.remove('btn-success');
+                sharepointBtn.classList.add('btn-neutral');
+                sharepointBtn.classList.add('is-disabled');
+                sharepointBtn.setAttribute('aria-disabled', 'true');
+                sharepointBtn.setAttribute('tabindex', '-1');
+            }
         }, 0);
     });
 
@@ -618,69 +701,12 @@ function loadReport(index) {
         document.getElementById('vaskeHelikopter').checked = report.vaskeHelikopter || false;
         document.getElementById('tommeBoss').checked = report.tommeBoss || false;
         
-        document.getElementById('heliOXH').checked = report.heliOXH || false;
-        document.getElementById('heliOXHText').value = report.heliOXHText || '';
-        document.getElementById('heliOXHText').disabled = !report.heliOXH;
-        document.getElementById('heliOXHText').style.display = report.heliOXH ? '' : 'none';
-        const heliOXHStatusDiv = document.getElementById('heliOXHStatus');
-        if (heliOXHStatusDiv) {
-            heliOXHStatusDiv.style.display = report.heliOXH ? 'flex' : 'none';
-            if (report.heliOXHStatus) {
-                const statusRadio = document.querySelector(`input[name="heliOXHStatus"][value="${report.heliOXHStatus}"]`);
-                if (statusRadio) statusRadio.checked = true;
-            }
-        }
-        
-        document.getElementById('heliOXB').checked = report.heliOXB || false;
-        document.getElementById('heliOXBText').value = report.heliOXBText || '';
-        document.getElementById('heliOXBText').disabled = !report.heliOXB;
-        document.getElementById('heliOXBText').style.display = report.heliOXB ? '' : 'none';
-        const heliOXBStatusDiv = document.getElementById('heliOXBStatus');
-        if (heliOXBStatusDiv) {
-            heliOXBStatusDiv.style.display = report.heliOXB ? 'flex' : 'none';
-            if (report.heliOXBStatus) {
-                const statusRadio = document.querySelector(`input[name="heliOXBStatus"][value="${report.heliOXBStatus}"]`);
-                if (statusRadio) statusRadio.checked = true;
-            }
-        }
-        
-        document.getElementById('heliOXI').checked = report.heliOXI || false;
-        document.getElementById('heliOXIText').value = report.heliOXIText || '';
-        document.getElementById('heliOXIText').disabled = !report.heliOXI;
-        document.getElementById('heliOXIText').style.display = report.heliOXI ? '' : 'none';
-        const heliOXIStatusDiv = document.getElementById('heliOXIStatus');
-        if (heliOXIStatusDiv) {
-            heliOXIStatusDiv.style.display = report.heliOXI ? 'flex' : 'none';
-            if (report.heliOXIStatus) {
-                const statusRadio = document.querySelector(`input[name="heliOXIStatus"][value="${report.heliOXIStatus}"]`);
-                if (statusRadio) statusRadio.checked = true;
-            }
-        }
-        
-        document.getElementById('heliOXJ').checked = report.heliOXJ || false;
-        document.getElementById('heliOXJText').value = report.heliOXJText || '';
-        document.getElementById('heliOXJText').disabled = !report.heliOXJ;
-        document.getElementById('heliOXJText').style.display = report.heliOXJ ? '' : 'none';
-        const heliOXJStatusDiv = document.getElementById('heliOXJStatus');
-        if (heliOXJStatusDiv) {
-            heliOXJStatusDiv.style.display = report.heliOXJ ? 'flex' : 'none';
-            if (report.heliOXJStatus) {
-                const statusRadio = document.querySelector(`input[name="heliOXJStatus"][value="${report.heliOXJStatus}"]`);
-                if (statusRadio) statusRadio.checked = true;
-            }
-        }
-        
-        document.getElementById('heliOXK').checked = report.heliOXK || false;
-        document.getElementById('heliOXKText').value = report.heliOXKText || '';
-        document.getElementById('heliOXKText').disabled = !report.heliOXK;
-        document.getElementById('heliOXKText').style.display = report.heliOXK ? '' : 'none';
-        const heliOXKStatusDiv = document.getElementById('heliOXKStatus');
-        if (heliOXKStatusDiv) {
-            heliOXKStatusDiv.style.display = report.heliOXK ? 'flex' : 'none';
-            if (report.heliOXKStatus) {
-                const statusRadio = document.querySelector(`input[name="heliOXKStatus"][value="${report.heliOXKStatus}"]`);
-                if (statusRadio) statusRadio.checked = true;
-            }
+        if (window.applyLoadedHelicopterState) {
+            window.applyLoadedHelicopterState('heliOXH', report.heliOXH, report.heliOXHText, report.heliOXHStatus);
+            window.applyLoadedHelicopterState('heliOXB', report.heliOXB, report.heliOXBText, report.heliOXBStatus);
+            window.applyLoadedHelicopterState('heliOXI', report.heliOXI, report.heliOXIText, report.heliOXIStatus);
+            window.applyLoadedHelicopterState('heliOXJ', report.heliOXJ, report.heliOXJText, report.heliOXJStatus);
+            window.applyLoadedHelicopterState('heliOXK', report.heliOXK, report.heliOXKText, report.heliOXKStatus);
         }
         
         // Scroll to top
@@ -1496,6 +1522,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     
     // Save PDF
     doc.save(filename);
+    window.dispatchEvent(new Event('vaktrapport:pdfExported'));
 }
 
 function formatDate(dateString) {
