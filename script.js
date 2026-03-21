@@ -186,9 +186,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportPdfBtn = document.getElementById('exportPdf');
     const sharepointBtn = document.getElementById('openSharepointMappe');
     const sendEmailBtn = document.getElementById('sendEmail');
+    const saveDraftBtn = document.getElementById('saveDraft');
     exportPdfBtn.addEventListener('click', function() {
         generatePDF();
     });
+    if (saveDraftBtn) {
+        saveDraftBtn.addEventListener('click', function() {
+            saveDraftReport();
+        });
+    }
 
     // E-mail shortcut with prefilled recipients/subject/body
     if (sendEmailBtn) {
@@ -208,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'karianne.blom@airlift.no',
                 'basetekniker-flesland@airlift.no',
                 'asgeir.hogstad@airlift.no'
-            ].join(',');
+            ].join('; ');
 
             const mailtoUrl =
                 `mailto:${encodeURIComponent(toRecipients)}` +
@@ -588,6 +594,83 @@ function saveReportToRegister(reportData) {
     loadReportRegister();
 }
 
+function collectCurrentReportData(isDraft) {
+    const date = (document.getElementById('date').value || '').trim();
+    const base = (document.getElementById('base').value || '').trim();
+    const vakttype = (document.getElementById('vakttype').value || '').trim();
+    const person = (document.getElementById('person').value || '').trim();
+    const statusBase = (document.getElementById('statusBase').value || '').trim();
+    const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover';
+
+    const kaffiChecked = document.getElementById('kaffi').checked;
+    const fuelTraktorChecked = document.getElementById('fuelTraktor').checked;
+    const vaskeGulvChecked = document.getElementById('vaskeGulv').checked;
+    const vaskeHelikopterChecked = document.getElementById('vaskeHelikopter').checked;
+    const tommeBossChecked = document.getElementById('tommeBoss').checked;
+
+    const heliOXH = document.getElementById('heliOXH').checked;
+    const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
+    const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
+    const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
+
+    const heliOXB = document.getElementById('heliOXB').checked;
+    const heliOXBText = heliOXB ? document.getElementById('heliOXBText').value : '';
+    const heliOXBStatusRadio = heliOXB ? document.querySelector('input[name="heliOXBStatus"]:checked') : null;
+    const heliOXBStatus = heliOXBStatusRadio ? heliOXBStatusRadio.value : '';
+
+    const heliOXI = document.getElementById('heliOXI').checked;
+    const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
+    const heliOXIStatusRadio = heliOXI ? document.querySelector('input[name="heliOXIStatus"]:checked') : null;
+    const heliOXIStatus = heliOXIStatusRadio ? heliOXIStatusRadio.value : '';
+
+    const heliOXJ = document.getElementById('heliOXJ').checked;
+    const heliOXJText = heliOXJ ? document.getElementById('heliOXJText').value : '';
+    const heliOXJStatusRadio = heliOXJ ? document.querySelector('input[name="heliOXJStatus"]:checked') : null;
+    const heliOXJStatus = heliOXJStatusRadio ? heliOXJStatusRadio.value : '';
+
+    const heliOXK = document.getElementById('heliOXK').checked;
+    const heliOXKText = heliOXK ? document.getElementById('heliOXKText').value : '';
+    const heliOXKStatusRadio = heliOXK ? document.querySelector('input[name="heliOXKStatus"]:checked') : null;
+    const heliOXKStatus = heliOXKStatusRadio ? heliOXKStatusRadio.value : '';
+
+    return {
+        date: date,
+        base: base,
+        vakttype: vakttype,
+        person: person,
+        statusBase: statusBase,
+        filePath: filePath,
+        kaffi: kaffiChecked,
+        fuelTraktor: fuelTraktorChecked,
+        vaskeGulv: vaskeGulvChecked,
+        vaskeHelikopter: vaskeHelikopterChecked,
+        tommeBoss: tommeBossChecked,
+        heliOXH: heliOXH,
+        heliOXHText: heliOXHText,
+        heliOXHStatus: heliOXHStatus,
+        heliOXB: heliOXB,
+        heliOXBText: heliOXBText,
+        heliOXBStatus: heliOXBStatus,
+        heliOXI: heliOXI,
+        heliOXIText: heliOXIText,
+        heliOXIStatus: heliOXIStatus,
+        heliOXJ: heliOXJ,
+        heliOXJText: heliOXJText,
+        heliOXJStatus: heliOXJStatus,
+        heliOXK: heliOXK,
+        heliOXKText: heliOXKText,
+        heliOXKStatus: heliOXKStatus,
+        isDraft: !!isDraft,
+        timestamp: new Date().toISOString()
+    };
+}
+
+function saveDraftReport() {
+    const reportData = collectCurrentReportData(true);
+    saveReportToRegister(reportData);
+    alert('Utkast lagret i arkivet.');
+}
+
 function loadReportRegister() {
     var registerDiv = document.getElementById('reportRegister');
     if (window.firestoreDb) {
@@ -654,15 +737,20 @@ function renderReportRegister(reports, registerDiv) {
         registerDiv.innerHTML = '<p class="no-reports">Ingen tidligere rapporter registrert</p>';
         return;
     }
-    registerDiv.innerHTML = reports.map(function(report, index) {
+    var drafts = reports.filter(function(report) { return !!report.isDraft; });
+    var regular = reports.filter(function(report) { return !report.isDraft; });
+
+    function renderRows(rows) {
+        return rows.map(function(report, index) {
         var sourceIndex = (typeof report._sourceIndex === 'number') ? report._sourceIndex : index;
         var reportDate = report.date || 'Ikke angitt';
         var base = report.base || 'Ikke angitt';
         var vakttype = report.vakttype || '';
         var person = report.person || 'Ikke angitt';
+        var draftBadge = report.isDraft ? '<span class="report-badge">Utkast</span>' : '';
         return '<div class="report-item">' +
             '<div class="report-item-info">' +
-            '<div class="report-item-date">' + formatDate(reportDate) + '</div>' +
+            '<div class="report-item-date">' + formatDate(reportDate) + draftBadge + '</div>' +
             '<div class="report-item-details">Base: ' + base + (vakttype ? ' | Vakttype: ' + vakttype : '') + ' | Personer: ' + person + '</div>' +
             '</div>' +
             '<div class="report-item-actions">' +
@@ -670,7 +758,17 @@ function renderReportRegister(reports, registerDiv) {
             '<button class="btn-small btn-pdf" onclick="downloadReportPdf(' + sourceIndex + ')">PDF</button>' +
             '<button class="btn-small btn-delete" onclick="deleteReport(' + sourceIndex + ')">Slett</button>' +
             '</div></div>';
-    }).join('');
+        }).join('');
+    }
+
+    var sections = '';
+    if (drafts.length > 0) {
+        sections += '<h3 class="report-group-title">Utkast</h3>' + renderRows(drafts);
+    }
+    if (regular.length > 0) {
+        sections += '<h3 class="report-group-title">Tidligere rapporter</h3>' + renderRows(regular);
+    }
+    registerDiv.innerHTML = sections || '<p class="no-reports">Ingen tidligere rapporter registrert</p>';
 }
 
 function loadReport(index) {
@@ -1564,6 +1662,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         heliOXK: heliOXK,
         heliOXKText: heliOXKText,
         heliOXKStatus: heliOXKStatus,
+        isDraft: false,
         timestamp: new Date().toISOString()
     };
     if (shouldSaveToRegister) {

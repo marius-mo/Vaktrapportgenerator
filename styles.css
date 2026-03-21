@@ -745,6 +745,27 @@ header h1 {
   gap: var(--space-3);
 }
 
+.report-group-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.report-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: var(--font-bold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: rgba(255, 179, 0, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(255, 179, 0, 0.45);
+}
+
 .register-filters {
   display: flex;
   align-items: center;

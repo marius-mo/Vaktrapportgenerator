@@ -167,7 +167,7 @@
             <p class="subtitle">Logg inn med passord for å åpne skifterapport-verktøyet.</p>
             <form id="loginForm" autocomplete="off">
                 <label for="password">Passord</label>
-                <input type="password" id="password" name="password" placeholder="Skriv inn passordet" required autocomplete="off">
+                <input type="password" id="password" name="password" placeholder="Skriv inn passordet" required autocomplete="off" autofocus>
                 <p class="login-error" id="loginError">Feil passord. Prøv igjen.</p>
                 <button type="submit">Logg inn</button>
                 <p class="meta">Tilgang er begrenset til interne brukere. Del ikke passordet videre.</p>
@@ -180,6 +180,12 @@
             var form = document.getElementById('loginForm');
             var input = document.getElementById('password');
             var errorEl = document.getElementById('loginError');
+
+            // Sikrer fokus i feltet også i nettlesere som ignorerer autofocus.
+            setTimeout(function () {
+                input.focus();
+                input.select();
+            }, 0);
 
             form.addEventListener('submit', function (e) {
                 e.preventDefault();
