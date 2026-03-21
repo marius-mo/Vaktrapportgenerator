@@ -76,17 +76,20 @@ window.vaktrapportDocsList = []; // liste med { id, ...reportData } fra Firestor
     } catch (e) { console.warn('Firebase init failed:', e); }
 })();
 
+function setDateToToday() {
+    const dateInput = document.getElementById('date');
+    if (!dateInput) return;
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    dateInput.value = `${year}-${month}-${day}`;
+}
+
 // Enable/disable helicopter text fields and show/hide status checkboxes based on checkbox state
 document.addEventListener('DOMContentLoaded', function() {
     // Set date to today automatically
-    const dateInput = document.getElementById('date');
-    if (dateInput) {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        dateInput.value = `${year}-${month}-${day}`;
-    }
+    setDateToToday();
     
     // Function to handle helicopter checkbox change
     function handleHelicopterChange(checkbox) {
@@ -514,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function() {
     reportForm.addEventListener('reset', function() {
         setTimeout(() => {
             reportTitle.textContent = 'Vaktrapport';
+            setDateToToday();
             // Hide all helicopter status fields
             document.querySelectorAll('.helicopter-status').forEach(statusDiv => {
                 statusDiv.style.display = 'none';
@@ -559,6 +563,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Load and display report register
+    const baseFilter = document.getElementById('reportBaseFilter');
+    if (baseFilter) {
+        baseFilter.addEventListener('change', applyReportBaseFilter);
+    }
     loadReportRegister();
 });
 
@@ -593,7 +601,8 @@ function loadReportRegister() {
                     data.id = d.id;
                     return data;
                 });
-                renderReportRegister(window.vaktrapportDocsList, registerDiv);
+                populateBaseFilter(window.vaktrapportDocsList);
+                applyReportBaseFilter();
             })
             .catch(function(err) {
                 console.error('Firestore load error:', err);
@@ -603,7 +612,41 @@ function loadReportRegister() {
     }
     var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
     window.vaktrapportDocsList = reports.map(function(r, i) { r.id = i; return r; });
-    renderReportRegister(reports, registerDiv);
+    populateBaseFilter(window.vaktrapportDocsList);
+    applyReportBaseFilter();
+}
+
+function populateBaseFilter(reports) {
+    var baseFilter = document.getElementById('reportBaseFilter');
+    if (!baseFilter) return;
+    var selected = baseFilter.value || '';
+    var bases = Array.from(new Set((reports || []).map(function(r) {
+        return (r.base || '').trim();
+    }).filter(Boolean))).sort();
+
+    baseFilter.innerHTML = '<option value="">Alle baser</option>' +
+        bases.map(function(base) {
+            return '<option value="' + base.replace(/"/g, '&quot;') + '">' + base + '</option>';
+        }).join('');
+    baseFilter.value = bases.includes(selected) ? selected : '';
+}
+
+function applyReportBaseFilter() {
+    var registerDiv = document.getElementById('reportRegister');
+    var baseFilter = document.getElementById('reportBaseFilter');
+    var selectedBase = baseFilter ? baseFilter.value : '';
+    var allReports = window.vaktrapportDocsList || [];
+    var filtered = allReports
+        .map(function(r, i) {
+            var copy = Object.assign({}, r);
+            copy._sourceIndex = i;
+            return copy;
+        })
+        .filter(function(r) {
+            if (!selectedBase) return true;
+            return (r.base || '').trim() === selectedBase;
+        });
+    renderReportRegister(filtered, registerDiv);
 }
 
 function renderReportRegister(reports, registerDiv) {
@@ -612,6 +655,7 @@ function renderReportRegister(reports, registerDiv) {
         return;
     }
     registerDiv.innerHTML = reports.map(function(report, index) {
+        var sourceIndex = (typeof report._sourceIndex === 'number') ? report._sourceIndex : index;
         var reportDate = report.date || 'Ikke angitt';
         var base = report.base || 'Ikke angitt';
         var vakttype = report.vakttype || '';
@@ -622,8 +666,9 @@ function renderReportRegister(reports, registerDiv) {
             '<div class="report-item-details">Base: ' + base + (vakttype ? ' | Vakttype: ' + vakttype : '') + ' | Personer: ' + person + '</div>' +
             '</div>' +
             '<div class="report-item-actions">' +
-            '<button class="btn-small btn-view" onclick="loadReport(' + index + ')">Vis</button>' +
-            '<button class="btn-small btn-delete" onclick="deleteReport(' + index + ')">Slett</button>' +
+            '<button class="btn-small btn-view" onclick="loadReport(' + sourceIndex + ')">Vis</button>' +
+            '<button class="btn-small btn-pdf" onclick="downloadReportPdf(' + sourceIndex + ')">PDF</button>' +
+            '<button class="btn-small btn-delete" onclick="deleteReport(' + sourceIndex + ')">Slett</button>' +
             '</div></div>';
     }).join('');
 }
@@ -634,7 +679,7 @@ function loadReport(index) {
     var report = reports[index];
         
         // Populate form with report data
-        if (report.date) document.getElementById('date').value = report.date;
+        setDateToToday();
         if (report.base) document.getElementById('base').value = report.base;
         if (report.vakttype) {
             document.getElementById('vakttype').value = report.vakttype;
@@ -711,6 +756,32 @@ function loadReport(index) {
         
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function downloadReportPdf(index) {
+    var reports = window.vaktrapportDocsList || [];
+    if (index < 0 || index >= reports.length) return;
+    var report = reports[index];
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const filePath = report.filePath || 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover';
+
+    generatePDFContent(
+        doc,
+        report.date || '',
+        report.base || '',
+        report.vakttype || '',
+        report.person || '',
+        report.statusBase || '',
+        filePath,
+        !!report.heliOXH, report.heliOXHText || '', report.heliOXHStatus || '',
+        !!report.heliOXB, report.heliOXBText || '', report.heliOXBStatus || '',
+        !!report.heliOXI, report.heliOXIText || '', report.heliOXIStatus || '',
+        !!report.heliOXJ, report.heliOXJText || '', report.heliOXJStatus || '',
+        !!report.heliOXK, report.heliOXKText || '', report.heliOXKStatus || '',
+        [], null, false
+    );
 }
 
 function deleteReport(index) {
@@ -863,7 +934,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     heliOXB, heliOXBText, heliOXBStatus,
     heliOXI, heliOXIText, heliOXIStatus,
     heliOXJ, heliOXJText, heliOXJStatus,
-    heliOXK, heliOXKText, heliOXKStatus, files = [], logoInfo = null) {
+    heliOXK, heliOXKText, heliOXKStatus, files = [], logoInfo = null, shouldSaveToRegister = true) {
     
     // Website Design System Colors - Aviation Inspired
     const primaryBlue = [30, 136, 229]; // #1E88E5 - Sky Blue
@@ -1495,7 +1566,9 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         heliOXKStatus: heliOXKStatus,
         timestamp: new Date().toISOString()
     };
-    saveReportToRegister(reportData);
+    if (shouldSaveToRegister) {
+        saveReportToRegister(reportData);
+    }
     
     // Add footer to all pages
     const pageCount = doc.internal.getNumberOfPages();
