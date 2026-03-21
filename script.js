@@ -1333,13 +1333,6 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
             totalHeliHeight += lines.length * 4.5;
         }
     }
-    if (heliOXB) {
-        totalHeliHeight += 14;
-        if (heliOXBText) {
-            const lines = doc.splitTextToSize(heliOXBText || '', contentWidth - 12);
-            totalHeliHeight += lines.length * 4.5;
-        }
-    }
     if (heliOXI) {
         totalHeliHeight += 14;
         if (heliOXIText) {
@@ -1358,6 +1351,13 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         totalHeliHeight += 14;
         if (heliOXKText) {
             const lines = doc.splitTextToSize(heliOXKText || '', contentWidth - 12);
+            totalHeliHeight += lines.length * 4.5;
+        }
+    }
+    if (heliOXB) {
+        totalHeliHeight += 14;
+        if (heliOXBText) {
+            const lines = doc.splitTextToSize(heliOXBText || '', contentWidth - 12);
             totalHeliHeight += lines.length * 4.5;
         }
     }
@@ -1439,28 +1439,6 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         }
     }
     
-    if (heliOXB) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text('LN-OXB', leftMargin + 4, heliContentY);
-        heliContentY += 5.5;
-        
-        if (heliOXBStatus) {
-            drawStatusBadge(heliOXBStatus, leftMargin + 4, heliContentY);
-            heliContentY += 7;
-        }
-        
-        if (heliOXBText) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
-            const linesOXB = doc.splitTextToSize(heliOXBText, contentWidth - 8);
-            doc.text(linesOXB, leftMargin + 4, heliContentY);
-            heliContentY += (linesOXB.length * 4.5) + 3;
-        }
-    }
-    
     if (heliOXI) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -1524,6 +1502,28 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
             const linesOXK = doc.splitTextToSize(heliOXKText, contentWidth - 8);
             doc.text(linesOXK, leftMargin + 4, heliContentY);
             heliContentY += (linesOXK.length * 4.5) + 3;
+        }
+    }
+
+    if (heliOXB) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
+        doc.text('LN-OBX', leftMargin + 4, heliContentY);
+        heliContentY += 5.5;
+        
+        if (heliOXBStatus) {
+            drawStatusBadge(heliOXBStatus, leftMargin + 4, heliContentY);
+            heliContentY += 7;
+        }
+        
+        if (heliOXBText) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+            const linesOXB = doc.splitTextToSize(heliOXBText, contentWidth - 8);
+            doc.text(linesOXB, leftMargin + 4, heliContentY);
+            heliContentY += (linesOXB.length * 4.5) + 3;
         }
     }
     
