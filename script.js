@@ -203,7 +203,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const vakttype = (document.getElementById('vakttype').value || 'Ikke angitt').trim();
             const date = (document.getElementById('date').value || '').trim();
 
-            const formattedDate = date || 'Ikke angitt';
+            let formattedDate = 'Ikke angitt';
+            if (date) {
+                const parts = date.split('-');
+                if (parts.length === 3) {
+                    formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else {
+                    formattedDate = date;
+                }
+            }
             const subject = `Statusrapport ${base} ${vakttype} ${formattedDate}`;
             const body = `Hei,\n\nSe vedlagt vaktrapport.\n\nGod vakt 😊`;
 
