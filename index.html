@@ -255,6 +255,22 @@
                 <p class="no-reports">Ingen tidligere rapporter registrert</p>
             </div>
         </div>
+
+        <div class="archive-link-wrapper">
+            <button type="button" id="openArchive" class="btn btn-neutral">Arkiv</button>
+        </div>
+    </div>
+
+    <div id="archiveModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>Arkiv <span class="modal-header-hint">(rapporter eldre enn 1 måned)</span></h2>
+                <button type="button" id="closeArchive" class="modal-close" aria-label="Lukk arkiv">&times;</button>
+            </div>
+            <div id="archiveRegister" class="report-register">
+                <p class="no-reports">Ingen arkiverte rapporter</p>
+            </div>
+        </div>
     </div>
 
     <!-- Firebase: erstatt verdiene under med din egen config fra Firebase Console -->
