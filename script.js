@@ -580,10 +580,105 @@ document.addEventListener('DOMContentLoaded', function() {
         baseFilter.addEventListener('change', applyReportBaseFilter);
     }
     loadReportRegister();
+
+    // Archive modal
+    const openArchiveBtn = document.getElementById('openArchive');
+    const archiveModal = document.getElementById('archiveModal');
+    const closeArchiveBtn = document.getElementById('closeArchive');
+    if (openArchiveBtn && archiveModal) {
+        openArchiveBtn.addEventListener('click', function() {
+            renderArchiveRegister();
+            archiveModal.style.display = 'flex';
+        });
+    }
+    if (closeArchiveBtn) {
+        closeArchiveBtn.addEventListener('click', closeArchiveModal);
+    }
+    if (archiveModal) {
+        archiveModal.addEventListener('click', function(e) {
+            if (e.target === archiveModal) closeArchiveModal();
+        });
+    }
 });
 
 // Store and retrieve reports: Firestore (felles) eller localStorage (lokal fallback)
 window.loadedDraftMeta = null;
+window.vaktrapportArchivedList = [];
+
+const DRAFT_EXPIRY_DAYS = 14;
+const ARCHIVE_AFTER_DAYS = 30;
+
+function daysSinceTimestamp(isoTimestamp) {
+    if (!isoTimestamp) return 0;
+    var then = new Date(isoTimestamp).getTime();
+    if (isNaN(then)) return 0;
+    return (Date.now() - then) / (1000 * 60 * 60 * 24);
+}
+
+function getReportAgeDays(report) {
+    var basis = report.date ? (report.date + 'T00:00:00') : report.timestamp;
+    if (!basis) return 0;
+    var then = new Date(basis).getTime();
+    if (isNaN(then)) return 0;
+    return (Date.now() - then) / (1000 * 60 * 60 * 24);
+}
+
+function pruneExpiredDrafts() {
+    var all = window.vaktrapportDocsList || [];
+    var isExpiredDraft = function(r) {
+        return !!r.isDraft && daysSinceTimestamp(r.timestamp) > DRAFT_EXPIRY_DAYS;
+    };
+    var expired = all.filter(isExpiredDraft);
+    if (expired.length === 0) return;
+
+    window.vaktrapportDocsList = all.filter(function(r) { return !isExpiredDraft(r); });
+
+    if (window.firestoreDb) {
+        expired.forEach(function(r) {
+            if (r.id) {
+                window.firestoreDb.collection('vaktrapporter').doc(r.id).delete()
+                    .catch(function(err) { console.error('Kunne ikke slette utgått utkast:', err); });
+            }
+        });
+    } else {
+        var stored = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
+        stored = stored.filter(function(r) { return !isExpiredDraft(r); });
+        localStorage.setItem('vaktrapport_reports', JSON.stringify(stored));
+    }
+}
+
+function closeArchiveModal() {
+    var modal = document.getElementById('archiveModal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeArchiveModal = closeArchiveModal;
+
+function renderArchiveRegister() {
+    var archiveDiv = document.getElementById('archiveRegister');
+    if (!archiveDiv) return;
+    var archived = window.vaktrapportArchivedList || [];
+    if (archived.length === 0) {
+        archiveDiv.innerHTML = '<p class="no-reports">Ingen arkiverte rapporter</p>';
+        return;
+    }
+    archiveDiv.innerHTML = archived.map(function(report) {
+        var sourceIndex = report._sourceIndex;
+        var reportDate = report.date || 'Ikke angitt';
+        var base = report.base || 'Ikke angitt';
+        var vakttype = report.vakttype || '';
+        var person = report.person || 'Ikke angitt';
+        return '<div class="report-item">' +
+            '<div class="report-item-info">' +
+            '<div class="report-item-date">' + formatDate(reportDate) + '</div>' +
+            '<div class="report-item-details">Base: ' + base + (vakttype ? ' | Vakttype: ' + vakttype : '') + ' | Personer: ' + person + '</div>' +
+            '</div>' +
+            '<div class="report-item-actions">' +
+            '<button class="btn-small btn-view" onclick="loadReport(' + sourceIndex + ')">Vis</button>' +
+            '<button class="btn-small btn-pdf" onclick="downloadReportPdf(' + sourceIndex + ')">PDF</button>' +
+            '<button class="btn-small btn-delete" onclick="deleteReport(' + sourceIndex + ')">Slett</button>' +
+            '</div></div>';
+    }).join('');
+}
 
 function saveReportToRegister(reportData) {
     if (window.firestoreDb) {
@@ -724,6 +819,7 @@ function loadReportRegister() {
                     data.id = d.id;
                     return data;
                 });
+                pruneExpiredDrafts();
                 populateBaseFilter(window.vaktrapportDocsList);
                 applyReportBaseFilter();
             })
@@ -735,6 +831,7 @@ function loadReportRegister() {
     }
     var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
     window.vaktrapportDocsList = reports.map(function(r, i) { r.id = i; return r; });
+    pruneExpiredDrafts();
     populateBaseFilter(window.vaktrapportDocsList);
     applyReportBaseFilter();
 }
@@ -769,7 +866,22 @@ function applyReportBaseFilter() {
             if (!selectedBase) return true;
             return (r.base || '').trim() === selectedBase;
         });
-    renderReportRegister(filtered, registerDiv);
+
+    var recent = filtered.filter(function(r) {
+        return !!r.isDraft || getReportAgeDays(r) <= ARCHIVE_AFTER_DAYS;
+    });
+    var archived = filtered.filter(function(r) {
+        return !r.isDraft && getReportAgeDays(r) > ARCHIVE_AFTER_DAYS;
+    });
+
+    window.vaktrapportArchivedList = archived;
+    renderReportRegister(recent, registerDiv);
+    renderArchiveRegister();
+
+    var openArchiveBtn = document.getElementById('openArchive');
+    if (openArchiveBtn) {
+        openArchiveBtn.textContent = archived.length > 0 ? 'Arkiv (' + archived.length + ')' : 'Arkiv';
+    }
 }
 
 function renderReportRegister(reports, registerDiv) {
@@ -815,6 +927,7 @@ function loadReport(index) {
     var reports = window.vaktrapportDocsList || [];
     if (index < 0 || index >= reports.length) return;
     var report = reports[index];
+    closeArchiveModal();
     window.loadedDraftMeta = {
         isDraft: !!report.isDraft,
         id: report.id || null,
