@@ -773,6 +773,19 @@ header h1 {
   margin-bottom: var(--space-4);
 }
 
+.template-action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.template-action-hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 .archive-link-wrapper {
   display: flex;
   justify-content: center;
