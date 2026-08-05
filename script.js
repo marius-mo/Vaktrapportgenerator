@@ -193,6 +193,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const loadTemplateBtn = document.getElementById('loadTemplate');
+    if (loadTemplateBtn) {
+        loadTemplateBtn.addEventListener('click', function() {
+            loadTemplateFromLastReport();
+        });
+    }
+
     // E-mail shortcut with prefilled recipients/subject/body
     if (sendEmailBtn) {
         sendEmailBtn.addEventListener('click', function () {
@@ -507,6 +514,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.updatePersonField = updatePersonField;
     window.updatePersonDropdown = updatePersonDropdown;
     window.selectedPersons = selectedPersons;
+
+    // Erstatt valgte personer uten å bryte referansen til closure-variabelen.
+    window.setSelectedPersons = function(names) {
+        selectedPersons.length = 0;
+        (names || []).forEach(function(name) {
+            if (name && !selectedPersons.includes(name)) selectedPersons.push(name);
+        });
+    };
 
     // Update title based on vakttype selection
     const vakttypeSelect = document.getElementById('vakttype');
@@ -923,6 +938,65 @@ function renderReportRegister(reports, registerDiv) {
     registerDiv.innerHTML = sections || '<p class="no-reports">Ingen tidligere rapporter registrert</p>';
 }
 
+const KNOWN_PERSON_NAMES = [
+    'Marius Høvik',
+    'Torfinn Roti',
+    'Eirik Dypevik',
+    'Johnny Mæland',
+    'Håvard Adsen',
+    'Odd Fiksdal',
+    'Johan Karlsson',
+    'Leif Rune Krogh Hus',
+    'Stig Hestad',
+    'Jøran Festervoll',
+    'Elliot Jaako',
+    'Gustav Svanstrøm',
+    'Andreas Valø',
+    'Luigino Visintini'
+];
+
+function populateFormFromReport(report) {
+    setDateToToday();
+    if (report.base) document.getElementById('base').value = report.base;
+    if (report.vakttype) {
+        document.getElementById('vakttype').value = report.vakttype;
+        document.getElementById('reportTitle').textContent = `Vaktrapport - ${report.vakttype}`;
+    }
+
+    // Load person selections
+    if (report.person) {
+        const personNames = report.person.split(',').map(n => n.trim()).filter(n => n);
+        const knownSelected = personNames.filter(n => KNOWN_PERSON_NAMES.includes(n));
+        const extraNames = personNames.filter(n => !KNOWN_PERSON_NAMES.includes(n));
+
+        if (window.setSelectedPersons) {
+            window.setSelectedPersons(knownSelected);
+        }
+        document.getElementById('personExtra').value = extraNames.join(', ');
+
+        if (window.updatePersonField) window.updatePersonField();
+        if (window.updatePersonDropdown) window.updatePersonDropdown();
+    }
+
+    document.getElementById('statusBase').value = report.statusBase || '';
+
+    document.getElementById('kaffi').checked = report.kaffi || false;
+    document.getElementById('fuelTraktor').checked = report.fuelTraktor || false;
+    document.getElementById('vaskeGulv').checked = report.vaskeGulv || false;
+    document.getElementById('vaskeHelikopter').checked = report.vaskeHelikopter || false;
+    document.getElementById('tommeBoss').checked = report.tommeBoss || false;
+
+    if (window.applyLoadedHelicopterState) {
+        window.applyLoadedHelicopterState('heliOXH', report.heliOXH, report.heliOXHText, report.heliOXHStatus);
+        window.applyLoadedHelicopterState('heliOXI', report.heliOXI, report.heliOXIText, report.heliOXIStatus);
+        window.applyLoadedHelicopterState('heliOXJ', report.heliOXJ, report.heliOXJText, report.heliOXJStatus);
+        window.applyLoadedHelicopterState('heliOXK', report.heliOXK, report.heliOXKText, report.heliOXKStatus);
+    }
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function loadReport(index) {
     var reports = window.vaktrapportDocsList || [];
     if (index < 0 || index >= reports.length) return;
@@ -934,84 +1008,24 @@ function loadReport(index) {
         index: index,
         timestamp: report.timestamp || null
     };
-        
-        // Populate form with report data
-        setDateToToday();
-        if (report.base) document.getElementById('base').value = report.base;
-        if (report.vakttype) {
-            document.getElementById('vakttype').value = report.vakttype;
-            // Update title when loading report
-            const reportTitle = document.getElementById('reportTitle');
-            reportTitle.textContent = `Vaktrapport - ${report.vakttype}`;
-        }
-        
-        // Load person selections
-        if (report.person) {
-            const personNames = report.person.split(',').map(n => n.trim()).filter(n => n);
-            const knownNames = [
-                'Marius Høvik',
-                'Torfinn Roti',
-                'Eirik Dypevik',
-                'Johnny Mæland',
-                'Håvard Adsen',
-                'Odd Fiksdal',
-                'Johan Karlsson',
-                'Leif Rune Krogh Hus',
-                'Stig Hestad',
-                'Jøran Festervoll',
-                'Elliot Jaako',
-                'Gustav Svanstrøm',
-                'Andreas Valø',
-                'Luigino Visintini'
-            ];
-            const extraNames = [];
-            
-            // Clear previous selections
-            if (window.selectedPersons) {
-                window.selectedPersons.length = 0;
-            }
-            selectedPersons = [];
-            
-            personNames.forEach(name => {
-                if (knownNames.includes(name)) {
-                    if (!selectedPersons.includes(name)) {
-                        selectedPersons.push(name);
-                    }
-                } else if (name) {
-                    extraNames.push(name);
-                }
-            });
-            
-            if (extraNames.length > 0) {
-                document.getElementById('personExtra').value = extraNames.join(', ');
-            } else {
-                document.getElementById('personExtra').value = '';
-            }
-            
-            if (window.updatePersonField) {
-                window.updatePersonField();
-            }
-            if (window.updatePersonDropdown) {
-                window.updatePersonDropdown();
-            }
-        }
-        document.getElementById('statusBase').value = report.statusBase || '';
-        
-        document.getElementById('kaffi').checked = report.kaffi || false;
-        document.getElementById('fuelTraktor').checked = report.fuelTraktor || false;
-        document.getElementById('vaskeGulv').checked = report.vaskeGulv || false;
-        document.getElementById('vaskeHelikopter').checked = report.vaskeHelikopter || false;
-        document.getElementById('tommeBoss').checked = report.tommeBoss || false;
-        
-        if (window.applyLoadedHelicopterState) {
-            window.applyLoadedHelicopterState('heliOXH', report.heliOXH, report.heliOXHText, report.heliOXHStatus);
-            window.applyLoadedHelicopterState('heliOXI', report.heliOXI, report.heliOXIText, report.heliOXIStatus);
-            window.applyLoadedHelicopterState('heliOXJ', report.heliOXJ, report.heliOXJText, report.heliOXJStatus);
-            window.applyLoadedHelicopterState('heliOXK', report.heliOXK, report.heliOXKText, report.heliOXKStatus);
-        }
-        
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    populateFormFromReport(report);
+}
+
+// Hent siste ferdige rapport (ikke utkast) og bruk den som mal for en ny rapport.
+function loadTemplateFromLastReport() {
+    var reports = (window.vaktrapportDocsList || []).filter(function(r) { return !r.isDraft; });
+    if (reports.length === 0) {
+        alert('Fant ingen tidligere rapport å hente mal fra.');
+        return;
+    }
+
+    var latest = reports.slice().sort(function(a, b) {
+        return new Date(b.timestamp || b.date || 0) - new Date(a.timestamp || a.date || 0);
+    })[0];
+
+    // Malen skal ikke knyttes til den opprinnelige rapporten.
+    clearLoadedDraftMeta();
+    populateFormFromReport(latest);
 }
 
 function downloadReportPdf(index) {
