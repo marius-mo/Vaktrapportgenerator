@@ -100,9 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (helicopterId === 'heliOXH') {
             textFieldId = 'heliOXHText';
             statusDivId = 'heliOXHStatus';
-        } else if (helicopterId === 'heliOXB') {
-            textFieldId = 'heliOXBText';
-            statusDivId = 'heliOXBStatus';
         } else if (helicopterId === 'heliOXI') {
             textFieldId = 'heliOXIText';
             statusDivId = 'heliOXIStatus';
@@ -664,11 +661,6 @@ function collectCurrentReportData(isDraft) {
     const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
     const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
 
-    const heliOXB = document.getElementById('heliOXB').checked;
-    const heliOXBText = heliOXB ? document.getElementById('heliOXBText').value : '';
-    const heliOXBStatusRadio = heliOXB ? document.querySelector('input[name="heliOXBStatus"]:checked') : null;
-    const heliOXBStatus = heliOXBStatusRadio ? heliOXBStatusRadio.value : '';
-
     const heliOXI = document.getElementById('heliOXI').checked;
     const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
     const heliOXIStatusRadio = heliOXI ? document.querySelector('input[name="heliOXIStatus"]:checked') : null;
@@ -699,9 +691,6 @@ function collectCurrentReportData(isDraft) {
         heliOXH: heliOXH,
         heliOXHText: heliOXHText,
         heliOXHStatus: heliOXHStatus,
-        heliOXB: heliOXB,
-        heliOXBText: heliOXBText,
-        heliOXBStatus: heliOXBStatus,
         heliOXI: heliOXI,
         heliOXIText: heliOXIText,
         heliOXIStatus: heliOXIStatus,
@@ -903,7 +892,6 @@ function loadReport(index) {
         
         if (window.applyLoadedHelicopterState) {
             window.applyLoadedHelicopterState('heliOXH', report.heliOXH, report.heliOXHText, report.heliOXHStatus);
-            window.applyLoadedHelicopterState('heliOXB', report.heliOXB, report.heliOXBText, report.heliOXBStatus);
             window.applyLoadedHelicopterState('heliOXI', report.heliOXI, report.heliOXIText, report.heliOXIStatus);
             window.applyLoadedHelicopterState('heliOXJ', report.heliOXJ, report.heliOXJText, report.heliOXJStatus);
             window.applyLoadedHelicopterState('heliOXK', report.heliOXK, report.heliOXKText, report.heliOXKStatus);
@@ -931,7 +919,6 @@ function downloadReportPdf(index) {
         report.statusBase || '',
         filePath,
         !!report.heliOXH, report.heliOXHText || '', report.heliOXHStatus || '',
-        !!report.heliOXB, report.heliOXBText || '', report.heliOXBStatus || '',
         !!report.heliOXI, report.heliOXIText || '', report.heliOXIStatus || '',
         !!report.heliOXJ, report.heliOXJText || '', report.heliOXJStatus || '',
         !!report.heliOXK, report.heliOXKText || '', report.heliOXKStatus || '',
@@ -1009,11 +996,6 @@ function generatePDF() {
         const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
         const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
         
-        const heliOXB = document.getElementById('heliOXB').checked;
-        const heliOXBText = heliOXB ? document.getElementById('heliOXBText').value : '';
-        const heliOXBStatusRadio = heliOXB ? document.querySelector('input[name="heliOXBStatus"]:checked') : null;
-        const heliOXBStatus = heliOXBStatusRadio ? heliOXBStatusRadio.value : '';
-        
         const heliOXI = document.getElementById('heliOXI').checked;
         const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
         const heliOXIStatusRadio = heliOXI ? document.querySelector('input[name="heliOXIStatus"]:checked') : null;
@@ -1034,8 +1016,7 @@ function generatePDF() {
         
         generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath, 
             heliOXH, heliOXHText, heliOXHStatus,
-            heliOXB, heliOXBText, heliOXBStatus,
-            heliOXI, heliOXIText, heliOXIStatus, 
+            heliOXI, heliOXIText, heliOXIStatus,
             heliOXJ, heliOXJText, heliOXJStatus,
             heliOXK, heliOXKText, heliOXKStatus, files, logoInfo);
     };
@@ -1051,11 +1032,6 @@ function generatePDF() {
         const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
         const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
         const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
-        
-        const heliOXB = document.getElementById('heliOXB').checked;
-        const heliOXBText = heliOXB ? document.getElementById('heliOXBText').value : '';
-        const heliOXBStatusRadio = heliOXB ? document.querySelector('input[name="heliOXBStatus"]:checked') : null;
-        const heliOXBStatus = heliOXBStatusRadio ? heliOXBStatusRadio.value : '';
         
         const heliOXI = document.getElementById('heliOXI').checked;
         const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
@@ -1076,8 +1052,7 @@ function generatePDF() {
         
         generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath, 
             heliOXH, heliOXHText, heliOXHStatus,
-            heliOXB, heliOXBText, heliOXBStatus,
-            heliOXI, heliOXIText, heliOXIStatus, 
+            heliOXI, heliOXIText, heliOXIStatus,
             heliOXJ, heliOXJText, heliOXJStatus,
             heliOXK, heliOXKText, heliOXKStatus, files, null);
     };
@@ -1086,7 +1061,6 @@ function generatePDF() {
 
 function generatePDFContent(doc, date, base, vakttype, person, statusBase, filePath,
     heliOXH, heliOXHText, heliOXHStatus,
-    heliOXB, heliOXBText, heliOXBStatus,
     heliOXI, heliOXIText, heliOXIStatus,
     heliOXJ, heliOXJText, heliOXJStatus,
     heliOXK, heliOXKText, heliOXKStatus, files = [], logoInfo = null, shouldSaveToRegister = true) {
@@ -1411,14 +1385,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
             totalHeliHeight += lines.length * 4.5;
         }
     }
-    if (heliOXB) {
-        totalHeliHeight += 14;
-        if (heliOXBText) {
-            const lines = doc.splitTextToSize(heliOXBText || '', contentWidth - 12);
-            totalHeliHeight += lines.length * 4.5;
-        }
-    }
-    if (!heliOXH && !heliOXB && !heliOXI && !heliOXJ && !heliOXK) {
+    if (!heliOXH && !heliOXI && !heliOXJ && !heliOXK) {
         totalHeliHeight += 8;
     }
     heliCardHeight = Math.max(totalHeliHeight, 22);
@@ -1502,7 +1469,6 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     if (heliOXI) selectedHelicopters.push({ title: 'LN-OXI', status: heliOXIStatus, text: heliOXIText });
     if (heliOXJ) selectedHelicopters.push({ title: 'LN-OXJ', status: heliOXJStatus, text: heliOXJText });
     if (heliOXK) selectedHelicopters.push({ title: 'LN-OXK', status: heliOXKStatus, text: heliOXKText });
-    if (heliOXB) selectedHelicopters.push({ title: 'LN-OBX', status: heliOXBStatus, text: heliOXBText });
 
     selectedHelicopters.forEach((helicopter, index) => {
         doc.setFont('helvetica', 'bold');
@@ -1519,7 +1485,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         }
     });
     
-    if (!heliOXH && !heliOXB && !heliOXI && !heliOXJ && !heliOXK) {
+    if (!heliOXH && !heliOXI && !heliOXJ && !heliOXK) {
         doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
         doc.text('(Ingen helikoptre valgt)', leftMargin + 4, heliContentY);
     }
@@ -1642,9 +1608,6 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         heliOXH: heliOXH,
         heliOXHText: heliOXHText,
         heliOXHStatus: heliOXHStatus,
-        heliOXB: heliOXB,
-        heliOXBText: heliOXBText,
-        heliOXBStatus: heliOXBStatus,
         heliOXI: heliOXI,
         heliOXIText: heliOXIText,
         heliOXIStatus: heliOXIStatus,
