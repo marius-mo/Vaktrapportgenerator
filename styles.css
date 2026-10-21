@@ -1604,40 +1604,23 @@ button:disabled {
    BASETEKNIKER
    ============================================ */
 
-.mode-switch {
-  display: flex;
-  gap: var(--space-2);
+.back-link-bar {
   padding: var(--space-4) var(--space-8) 0;
-  flex-wrap: wrap;
 }
 
-.mode-switch-item {
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+.back-link {
   font-weight: var(--font-semibold);
-  font-size: var(--text-base);
-  text-decoration: none;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 2px solid var(--color-gray-200);
-  border-bottom: none;
-  transition: all var(--duration-normal) var(--ease-in-out);
-}
-
-.mode-switch-item:hover {
+  font-size: var(--text-sm);
   color: var(--color-primary-700);
-  background: var(--bg-primary);
+  text-decoration: none;
 }
 
-.mode-switch-item.is-active {
-  background: var(--color-primary-700);
-  border-color: var(--color-primary-700);
-  color: #fff;
+.back-link:hover {
+  text-decoration: underline;
 }
 
-[data-theme="dark"] .mode-switch-item.is-active {
-  background: var(--color-primary-600);
-  border-color: var(--color-primary-600);
+[data-theme="dark"] .back-link {
+  color: var(--color-primary-500);
 }
 
 .section-heading-row {
@@ -1976,7 +1959,7 @@ button:disabled {
 }
 
 @media (max-width: 768px) {
-  .mode-switch {
+  .back-link-bar {
     padding: var(--space-3) var(--space-4) 0;
   }
 
