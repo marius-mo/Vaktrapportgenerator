@@ -44,15 +44,6 @@
                     <label for="btDate">Dato:</label>
                     <input type="date" id="btDate" required>
                 </div>
-
-                <div class="form-group">
-                    <label for="btBase">Base:</label>
-                    <select id="btBase" required>
-                        <option value="Bergen">Bergen</option>
-                        <option value="Tromsø">Tromsø</option>
-                        <option value="Hammerfest">Hammerfest</option>
-                    </select>
-                </div>
             </div>
 
             <div class="form-group">
@@ -71,15 +62,8 @@
                 </div>
             </div>
             <p class="form-actions-note">
-                Basevalget styrer hvilke saker og hvilken basestatus du ser under. Endringer lagres fortløpende og deles med de andre teknikerne.
+                Oversikten gjelder alle tre baser: BGO, TOS og HFT. Endringer lagres fortløpende og deles med de andre teknikerne.
             </p>
-        </div>
-
-        <div class="form-section">
-            <h2>Helikopterstatus</h2>
-            <div id="helicopterBoard" class="helicopter-board">
-                <p class="no-reports">Laster...</p>
-            </div>
         </div>
 
         <div class="form-section">
@@ -88,15 +72,15 @@
                 <button type="button" id="newIssueBtn" class="btn btn-success">Ny sak</button>
             </div>
 
+            <div id="issueBaseSummary" class="base-summary"></div>
+
             <div class="issue-filters">
-                <label class="issue-filter-chip">
-                    <input type="checkbox" id="filterShowClosed">
-                    <span>Vis lukkede saker</span>
-                </label>
-                <label class="issue-filter-chip">
-                    <input type="checkbox" id="filterAllBases">
-                    <span>Vis alle baser</span>
-                </label>
+                <select id="filterBase" class="issue-filter-select">
+                    <option value="">Alle baser</option>
+                    <option value="BGO">BGO</option>
+                    <option value="TOS">TOS</option>
+                    <option value="HFT">HFT</option>
+                </select>
                 <select id="filterKategori" class="issue-filter-select">
                     <option value="">Alle kategorier</option>
                     <option value="Feil">Feil</option>
@@ -105,9 +89,62 @@
                     <option value="Tools/kalibrering">Tools/kalibrering</option>
                     <option value="Annet">Annet</option>
                 </select>
+                <label class="issue-filter-chip">
+                    <input type="checkbox" id="filterShowClosed">
+                    <span>Vis lukkede saker</span>
+                </label>
             </div>
 
             <div id="issueBoard" class="issue-board">
+                <p class="no-reports">Laster...</p>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-heading-row">
+                <h2>Større reparasjoner</h2>
+                <button type="button" id="newProjectBtn" class="btn btn-neutral">Ny reparasjon</button>
+            </div>
+            <div class="issue-filters">
+                <label class="issue-filter-chip">
+                    <input type="checkbox" id="filterShowDoneProjects">
+                    <span>Vis ferdige reparasjoner</span>
+                </label>
+            </div>
+            <div id="projectBoard" class="bt-card-list">
+                <p class="no-reports">Laster...</p>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-heading-row">
+                <h2>Tools – neste due</h2>
+                <button type="button" id="newToolBtn" class="btn btn-neutral">Legg til manuelt</button>
+            </div>
+
+            <div id="toolBaseSummary" class="base-summary"></div>
+
+            <div id="toolDropZone" class="file-upload-area tool-drop-zone" tabindex="0" role="button">
+                <p>Dra inn due-rapport her, eller klikk for å velge fil</p>
+                <p class="file-upload-hint">PDF, Excel eller CSV. Du ser over og godkjenner datoene før noe lagres.</p>
+            </div>
+            <input type="file" id="toolFileInput" accept=".pdf,.xlsx,.xls,.csv,.txt" style="display: none;">
+
+            <div class="issue-filters">
+                <select id="toolFilterBase" class="issue-filter-select">
+                    <option value="">Alle baser</option>
+                    <option value="BGO">BGO</option>
+                    <option value="TOS">TOS</option>
+                    <option value="HFT">HFT</option>
+                </select>
+                <select id="toolFilterPeriode" class="issue-filter-select">
+                    <option value="60">Forfalt og due innen 60 dager</option>
+                    <option value="">Alle tools</option>
+                </select>
+                <span id="toolCount" class="tool-count"></span>
+            </div>
+
+            <div id="toolList" class="tool-list">
                 <p class="no-reports">Laster...</p>
             </div>
         </div>
@@ -148,13 +185,20 @@
             </div>
         </div>
 
+        <div class="form-section">
+            <h2>Ettersyn</h2>
+            <div id="ettersynPanel">
+                <p class="no-reports">Laster...</p>
+            </div>
+        </div>
+
         <div class="form-actions">
             <button type="button" id="btExportPdf" class="btn btn-success">Generer vaktrapport (PDF)</button>
             <button type="button" id="btSendEmail" class="btn btn-neutral" disabled>Send e-post</button>
             <button type="button" id="btReset" class="btn btn-danger">Nullstill vaktfelt</button>
         </div>
         <p class="form-actions-note">
-            Rapporten tar et øyeblikksbilde av helikopterstatus og åpne saker ved vaktslutt. Sakene blir stående på tavlen til noen lukker dem.
+            Rapporten tar et øyeblikksbilde av saker, reparasjoner, tools-due og ettersyn ved vaktslutt. Alt blir stående til noen lukker det.
         </p>
 
         <div class="register-section">
@@ -228,9 +272,9 @@
                     <div class="form-group">
                         <label for="issueBase">Base:</label>
                         <select id="issueBase">
-                            <option value="Bergen">Bergen</option>
-                            <option value="Tromsø">Tromsø</option>
-                            <option value="Hammerfest">Hammerfest</option>
+                            <option value="BGO">BGO</option>
+                            <option value="TOS">TOS</option>
+                            <option value="HFT">HFT</option>
                         </select>
                     </div>
                 </div>
@@ -246,6 +290,68 @@
             <div class="modal-footer">
                 <button type="button" id="issueSaveBtn" class="btn btn-success">Lagre</button>
                 <button type="button" id="issueDeleteBtn" class="btn btn-danger" style="display: none;">Slett sak</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toolModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 id="toolModalTitle">Legg til tool</h2>
+                <button type="button" id="toolModalClose" class="modal-close" aria-label="Lukk">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="toolBeskrivelse">Tool / beskrivelse:</label>
+                    <input type="text" id="toolBeskrivelse" placeholder="f.eks. TQ-0045 Momentnøkkel 20–100 Nm">
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label for="toolBase">Base:</label>
+                        <select id="toolBase">
+                            <option value="BGO">BGO</option>
+                            <option value="TOS">TOS</option>
+                            <option value="HFT">HFT</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolDue">Neste due:</label>
+                        <input type="date" id="toolDue">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="toolSaveBtn" class="btn btn-success">Lagre</button>
+                <button type="button" id="toolDeleteBtn" class="btn btn-danger" style="display: none;">Slett</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="importModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box modal-box-wide">
+            <div class="modal-header">
+                <h2>Importer due-datoer</h2>
+                <button type="button" id="importModalClose" class="modal-close" aria-label="Lukk">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="importInfo" class="import-info"></p>
+                <div class="import-controls">
+                    <label for="importStandardBase">Base for rader uten base:</label>
+                    <select id="importStandardBase" class="issue-filter-select">
+                        <option value="">Velg base...</option>
+                        <option value="BGO">BGO</option>
+                        <option value="TOS">TOS</option>
+                        <option value="HFT">HFT</option>
+                    </select>
+                    <label class="issue-filter-chip">
+                        <input type="checkbox" id="importVelgAlle">
+                        <span>Velg alle</span>
+                    </label>
+                </div>
+                <div id="importRows" class="import-rows"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="importSaveBtn" class="btn btn-success">Importer valgte</button>
             </div>
         </div>
     </div>
