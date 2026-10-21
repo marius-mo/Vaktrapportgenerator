@@ -424,6 +424,59 @@ function btAktivTekniker() {
 }
 
 // ============================================
+// TEKNIKERVALG (samme oppsett som «Personer involvert» på operativ side)
+// ============================================
+
+const BT_TEKNIKERE = ['Gustav Svanstrøm', 'Johan Karlsson'];
+var btValgteTeknikere = [];
+
+// Samler valgte og fritekst-navn i det skjulte feltet resten av siden leser.
+function btOppdaterTeknikerFelt() {
+    var ekstra = document.getElementById('btTeknikerExtra').value
+        .split(',').map(function(n) { return n.trim(); }).filter(Boolean);
+    var alle = btValgteTeknikere.slice();
+    ekstra.forEach(function(n) { if (alle.indexOf(n) === -1) alle.push(n); });
+
+    document.getElementById('btTekniker').value = alle.join(', ');
+    localStorage.setItem('bt_tekniker', alle.join(', '));
+    btRenderTeknikerValg();
+}
+
+function btRenderTeknikerValg() {
+    var dropdown = document.getElementById('btTeknikerDropdown');
+    dropdown.innerHTML = '<option value="">Velg tekniker...</option>' +
+        BT_TEKNIKERE.filter(function(n) { return btValgteTeknikere.indexOf(n) === -1; })
+            .map(function(n) {
+                return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>';
+            }).join('');
+
+    var liste = document.getElementById('btValgteTeknikere');
+    if (btValgteTeknikere.length === 0) {
+        liste.innerHTML = '<p class="no-persons">Ingen tekniker valgt</p>';
+        return;
+    }
+    liste.innerHTML = btValgteTeknikere.map(function(n, i) {
+        return '<div class="selected-person-item"><span>' + escapeHtml(n) + '</span>' +
+            '<button type="button" class="remove-person-btn" data-index="' + i + '">×</button></div>';
+    }).join('');
+    liste.querySelectorAll('.remove-person-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btValgteTeknikere.splice(parseInt(this.getAttribute('data-index'), 10), 1);
+            btOppdaterTeknikerFelt();
+        });
+    });
+}
+
+// Fordeler lagrede navn på faste teknikere og fritekst.
+function btSettTeknikere(tekst) {
+    var navn = (tekst || '').split(',').map(function(n) { return n.trim(); }).filter(Boolean);
+    btValgteTeknikere = navn.filter(function(n) { return BT_TEKNIKERE.indexOf(n) !== -1; });
+    document.getElementById('btTeknikerExtra').value =
+        navn.filter(function(n) { return BT_TEKNIKERE.indexOf(n) === -1; }).join(', ');
+    btOppdaterTeknikerFelt();
+}
+
+// ============================================
 // SAKSDIALOG
 // ============================================
 
@@ -438,9 +491,12 @@ function btAapneSakModal(id) {
     document.getElementById('issueKategori').value = sak ? (sak.kategori || 'Feil') : 'Feil';
     document.getElementById('issuePrioritet').value = sak ? (sak.prioritet || 'Normal') : 'Normal';
     document.getElementById('issueStatus').value = sak ? (sak.status || 'Åpen') : 'Åpen';
+    // Ny sak: foreslå ansvarlig bare når én tekniker er på jobb.
+    var paaJobb = document.getElementById('btTekniker').value.split(',')
+        .map(function(n) { return n.trim(); }).filter(Boolean);
     document.getElementById('issueAnsvarlig').value = sak
         ? (sak.ansvarlig || '')
-        : btAktivTekniker().replace('Ukjent', '');
+        : (paaJobb.length === 1 ? paaJobb[0] : '');
     document.getElementById('issueBase').value = sak
         ? (sak.base || 'Bergen')
         : document.getElementById('btBase').value;
@@ -585,8 +641,8 @@ function btGenererPdf() {
         return;
     }
     if (!document.getElementById('btTekniker').value.trim()) {
-        alert('Fyll inn hvem som har vært på vakt.');
-        document.getElementById('btTekniker').focus();
+        alert('Velg hvilken basetekniker som er på jobb.');
+        document.getElementById('btTeknikerDropdown').focus();
         return;
     }
 
@@ -1017,16 +1073,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Husk base og tekniker lokalt, så man slipper å fylle ut hver vakt.
     var lagretBase = localStorage.getItem('bt_valgt_base');
     if (lagretBase) document.getElementById('btBase').value = lagretBase;
-    var lagretTekniker = localStorage.getItem('bt_tekniker');
-    if (lagretTekniker) document.getElementById('btTekniker').value = lagretTekniker;
+    btSettTeknikere(localStorage.getItem('bt_tekniker') || '');
 
     document.getElementById('btBase').addEventListener('change', function() {
         localStorage.setItem('bt_valgt_base', this.value);
         btRenderIssueBoard();
     });
-    document.getElementById('btTekniker').addEventListener('change', function() {
-        localStorage.setItem('bt_tekniker', this.value.trim());
+    document.getElementById('btTeknikerDropdown').addEventListener('change', function() {
+        if (this.value && btValgteTeknikere.indexOf(this.value) === -1) {
+            btValgteTeknikere.push(this.value);
+            btOppdaterTeknikerFelt();
+        }
     });
+    document.getElementById('btTeknikerExtra').addEventListener('input', btOppdaterTeknikerFelt);
 
     ['filterShowClosed', 'filterAllBases', 'filterKategori'].forEach(function(id) {
         document.getElementById(id).addEventListener('change', btRenderIssueBoard);

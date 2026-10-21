@@ -956,7 +956,9 @@ header h1 {
 }
 
 #personDropdown,
-#personExtra {
+#personExtra,
+#btTeknikerDropdown,
+#btTeknikerExtra {
   width: 100%;
   padding: var(--space-3) var(--space-4);
   border: 2px solid var(--color-gray-300);
@@ -969,7 +971,9 @@ header h1 {
 }
 
 #personDropdown:focus,
-#personExtra:focus {
+#personExtra:focus,
+#btTeknikerDropdown:focus,
+#btTeknikerExtra:focus {
   outline: none;
   border-color: var(--color-primary-500);
   box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.1);

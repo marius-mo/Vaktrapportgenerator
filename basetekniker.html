@@ -53,10 +53,21 @@
                         <option value="Hammerfest">Hammerfest</option>
                     </select>
                 </div>
+            </div>
 
-                <div class="form-group">
-                    <label for="btTekniker">Tekniker(e) på vakt:</label>
-                    <input type="text" id="btTekniker" placeholder="Navn, kommaseparert">
+            <div class="form-group">
+                <label for="btTeknikerDropdown">Basetekniker på jobb:</label>
+                <div class="person-selector">
+                    <div class="person-selector-left">
+                        <select id="btTeknikerDropdown">
+                            <option value="">Velg tekniker...</option>
+                        </select>
+                        <input type="text" id="btTeknikerExtra" placeholder="Andre navn (kommaseparert)">
+                    </div>
+                    <div class="person-selector-right">
+                        <div id="btValgteTeknikere" class="selected-persons-list"></div>
+                    </div>
+                    <input type="hidden" id="btTekniker">
                 </div>
             </div>
             <p class="form-actions-note">
