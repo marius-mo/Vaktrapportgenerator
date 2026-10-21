@@ -447,7 +447,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    vakttypeSelect.addEventListener('change', updateTitle);
+    // «Basetekniker» er ikke en vakttype i dette skjemaet, men en snarvei til egen side.
+    vakttypeSelect.addEventListener('change', function() {
+        if (vakttypeSelect.value === 'Basetekniker') {
+            window.location.href = 'basetekniker.html';
+            return;
+        }
+        updateTitle();
+    });
+
+    // Når man går tilbake med nettleserens tilbakeknapp kan valget bli husket.
+    window.addEventListener('pageshow', function() {
+        if (vakttypeSelect.value === 'Basetekniker') {
+            vakttypeSelect.value = '';
+            updateTitle();
+        }
+    });
     
     // Reset title and hide status fields when form is reset
     const reportForm = document.getElementById('reportForm');

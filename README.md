@@ -4,7 +4,8 @@ Skifterapport-generator for ukentlige vaktrapporter. Bruker Firebase Firestore f
 
 ## To rapporttyper
 
-Siden har to generatorer, og du veksler mellom dem med fanene øverst:
+Siden har to generatorer. Velg «Basetekniker» under Vakttype for å komme til
+teknikersiden, og bruk «Tilbake til operativ vakt» øverst der for å gå tilbake:
 
 - **Operativ vakt** (`index.html`) – rapporten for LOS/Politi-vakt. Ett øyeblikksbilde per vakt.
 - **Basetekniker** (`basetekniker.html`) – levende statustavle for teknisk vedlikehold.
