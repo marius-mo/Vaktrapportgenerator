@@ -55,6 +55,13 @@ function btNyId() {
 
 // --- Saker ---
 
+// GSE er fjernet; eldre saker flyttes til tilsvarende tools-verdier.
+function btNormaliserSak(sak) {
+    if (sak.kategori === 'GSE/verktøy') sak.kategori = 'Tools/kalibrering';
+    if (sak.omraade === 'GSE/verktøy') sak.omraade = 'Tools';
+    return sak;
+}
+
 function btLyttPaaSaker() {
     if (btHarSky()) {
         window.firestoreDb.collection(BT_COLLECTION_SAKER)
@@ -62,7 +69,7 @@ function btLyttPaaSaker() {
                 btSaker = snapshot.docs.map(function(d) {
                     var data = d.data();
                     data.id = d.id;
-                    return data;
+                    return btNormaliserSak(data);
                 });
                 btRenderIssueBoard();
             }, function(err) {
@@ -72,7 +79,7 @@ function btLyttPaaSaker() {
             });
         return;
     }
-    btSaker = btLesLokalt(BT_LS_SAKER, '[]');
+    btSaker = btLesLokalt(BT_LS_SAKER, '[]').map(btNormaliserSak);
     btRenderIssueBoard();
 }
 
@@ -535,7 +542,6 @@ function btSamleRapportData() {
         tekniker: document.getElementById('btTekniker').value.trim(),
         kontroll: {
             verktoy: document.getElementById('btVerktoy').checked,
-            gse: document.getElementById('btGse').checked,
             kalibrering: document.getElementById('btKalibrering').checked,
             hangar: document.getElementById('btHangar').checked,
             forbruk: document.getElementById('btForbruk').checked
@@ -803,8 +809,7 @@ function btTegnPdf(data, logoInfo) {
     seksjonstittel('Basestatus');
     var punkter = [
         ['Verktøy på plass', data.kontroll.verktoy],
-        ['GSE i orden', data.kontroll.gse],
-        ['Kalibrering à jour', data.kontroll.kalibrering],
+        ['Kalibrering av tools à jour', data.kontroll.kalibrering],
         ['Hangar ryddig', data.kontroll.hangar],
         ['Forbruksmateriell OK', data.kontroll.forbruk]
     ];
@@ -1045,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btSendEmail').addEventListener('click', btSendEpost);
     document.getElementById('btReset').addEventListener('click', function() {
         if (!confirm('Nullstille vaktfeltene? Saker og helikopterstatus beholdes.')) return;
-        ['btVerktoy', 'btGse', 'btKalibrering', 'btHangar', 'btForbruk'].forEach(function(id) {
+        ['btVerktoy', 'btKalibrering', 'btHangar', 'btForbruk'].forEach(function(id) {
             document.getElementById(id).checked = false;
         });
         document.getElementById('btGenerelt').value = '';
