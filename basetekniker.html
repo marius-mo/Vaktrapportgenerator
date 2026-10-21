@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Statusoversikt og vaktrapport for baseteknikere">
+    <title>Basetekniker - Vaktrapport</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Inter Font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <script>
+        (function () {
+            if (!sessionStorage.getItem('vaktrapport_auth')) {
+                window.location.href = 'login.html';
+            }
+        })();
+    </script>
+    <div class="container">
+        <div class="filepath-header">Sharepoint: \Technical - Part-145\Planning\Status reports - Handover</div>
+        <header>
+            <h1>Basetekniker</h1>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+                <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z"/>
+                </svg>
+                <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </header>
+
+        <nav class="mode-switch" aria-label="Velg rapporttype">
+            <a class="mode-switch-item" href="index.html">Operativ vakt</a>
+            <span class="mode-switch-item is-active" aria-current="page">Basetekniker</span>
+        </nav>
+
+        <div class="form-section">
+            <div class="form-row-3">
+                <div class="form-group">
+                    <label for="btDate">Dato:</label>
+                    <input type="date" id="btDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="btBase">Base:</label>
+                    <select id="btBase" required>
+                        <option value="Bergen">Bergen</option>
+                        <option value="Tromsø">Tromsø</option>
+                        <option value="Hammerfest">Hammerfest</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="btTekniker">Tekniker(e) på vakt:</label>
+                    <input type="text" id="btTekniker" placeholder="Navn, kommaseparert">
+                </div>
+            </div>
+            <p class="form-actions-note">
+                Basevalget styrer hvilke saker og hvilken basestatus du ser under. Endringer lagres fortløpende og deles med de andre teknikerne.
+            </p>
+        </div>
+
+        <div class="form-section">
+            <h2>Helikopterstatus</h2>
+            <div id="helicopterBoard" class="helicopter-board">
+                <p class="no-reports">Laster...</p>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-heading-row">
+                <h2>Utestående saker <span class="live-badge" id="liveBadge" title="Oppdateres automatisk">Live</span></h2>
+                <button type="button" id="newIssueBtn" class="btn btn-success">Ny sak</button>
+            </div>
+
+            <div class="issue-filters">
+                <label class="issue-filter-chip">
+                    <input type="checkbox" id="filterShowClosed">
+                    <span>Vis lukkede saker</span>
+                </label>
+                <label class="issue-filter-chip">
+                    <input type="checkbox" id="filterAllBases">
+                    <span>Vis alle baser</span>
+                </label>
+                <select id="filterKategori" class="issue-filter-select">
+                    <option value="">Alle kategorier</option>
+                    <option value="Feil">Feil</option>
+                    <option value="Ettersyn">Ettersyn</option>
+                    <option value="Deler">Deler</option>
+                    <option value="GSE/verktøy">GSE/verktøy</option>
+                    <option value="Annet">Annet</option>
+                </select>
+            </div>
+
+            <div id="issueBoard" class="issue-board">
+                <p class="no-reports">Laster...</p>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Basestatus</h2>
+            <div class="checkbox-group">
+                <label class="checkbox-label kontrollpunkt-item">
+                    <input type="checkbox" id="btVerktoy">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-text">Verktøy på plass</span>
+                </label>
+                <label class="checkbox-label kontrollpunkt-item">
+                    <input type="checkbox" id="btGse">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-text">GSE i orden</span>
+                </label>
+                <label class="checkbox-label kontrollpunkt-item">
+                    <input type="checkbox" id="btKalibrering">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-text">Kalibrering à jour</span>
+                </label>
+                <label class="checkbox-label kontrollpunkt-item">
+                    <input type="checkbox" id="btHangar">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-text">Hangar ryddig</span>
+                </label>
+                <label class="checkbox-label kontrollpunkt-item">
+                    <input type="checkbox" id="btForbruk">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-text">Forbruksmateriell OK</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="btGenerelt">Generell status / hendelser denne vakten:</label>
+                <textarea id="btGenerelt" placeholder="Hva er gjort, hva skjedde, hva bør neste vakt vite?"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="btOverlevering">Overlevering til neste vakt:</label>
+                <textarea id="btOverlevering" placeholder="Arbeid som ikke er ferdig, og hva som må følges opp først."></textarea>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" id="btExportPdf" class="btn btn-success">Generer vaktrapport (PDF)</button>
+            <button type="button" id="btSendEmail" class="btn btn-neutral" disabled>Send e-post</button>
+            <button type="button" id="btReset" class="btn btn-danger">Nullstill vaktfelt</button>
+        </div>
+        <p class="form-actions-note">
+            Rapporten tar et øyeblikksbilde av helikopterstatus og åpne saker ved vaktslutt. Sakene blir stående på tavlen til noen lukker dem.
+        </p>
+
+        <div class="register-section">
+            <h2>Tidligere teknikerrapporter</h2>
+            <div id="btReportRegister" class="report-register">
+                <p class="no-reports">Ingen tidligere rapporter registrert</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="issueModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 id="issueModalTitle">Ny sak</h2>
+                <button type="button" id="issueModalClose" class="modal-close" aria-label="Lukk">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="issueTittel">Tittel:</label>
+                    <input type="text" id="issueTittel" placeholder="Kort beskrivelse av saken">
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label for="issueOmraade">Helikopter / område:</label>
+                        <select id="issueOmraade">
+                            <option value="LN-OXH">LN-OXH</option>
+                            <option value="LN-OXI">LN-OXI</option>
+                            <option value="LN-OXJ">LN-OXJ</option>
+                            <option value="LN-OXK">LN-OXK</option>
+                            <option value="Hangar">Hangar</option>
+                            <option value="GSE/verktøy">GSE/verktøy</option>
+                            <option value="Base/annet">Base/annet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="issueKategori">Kategori:</label>
+                        <select id="issueKategori">
+                            <option value="Feil">Feil</option>
+                            <option value="Ettersyn">Ettersyn</option>
+                            <option value="Deler">Deler</option>
+                            <option value="GSE/verktøy">GSE/verktøy</option>
+                            <option value="Annet">Annet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="issuePrioritet">Prioritet:</label>
+                        <select id="issuePrioritet">
+                            <option value="Høy">Høy</option>
+                            <option value="Normal" selected>Normal</option>
+                            <option value="Lav">Lav</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label for="issueStatus">Status:</label>
+                        <select id="issueStatus">
+                            <option value="Åpen">Åpen</option>
+                            <option value="Pågår">Pågår</option>
+                            <option value="Venter på deler">Venter på deler</option>
+                            <option value="Lukket">Lukket</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="issueAnsvarlig">Ansvarlig:</label>
+                        <input type="text" id="issueAnsvarlig" placeholder="Navn">
+                    </div>
+                    <div class="form-group">
+                        <label for="issueBase">Base:</label>
+                        <select id="issueBase">
+                            <option value="Bergen">Bergen</option>
+                            <option value="Tromsø">Tromsø</option>
+                            <option value="Hammerfest">Hammerfest</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="issueNyLogg" id="issueNyLoggLabel">Beskrivelse:</label>
+                    <textarea id="issueNyLogg" placeholder="Hva er situasjonen nå?"></textarea>
+                </div>
+
+                <div id="issueLoggHistorikk" class="issue-log-history"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" id="issueSaveBtn" class="btn btn-success">Lagre</button>
+                <button type="button" id="issueDeleteBtn" class="btn btn-danger" style="display: none;">Slett sak</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase: erstatt verdiene under med din egen config fra Firebase Console -->
+    <script>
+    window.FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCH6_o6M_6Lgwrwf7fpWhunqBadI3ZPQHs",
+  authDomain: "vaktrapportgenerator.firebaseapp.com",
+  projectId: "vaktrapportgenerator",
+  storageBucket: "vaktrapportgenerator.firebasestorage.app",
+  messagingSenderId: "93816409964",
+  appId: "1:93816409964:web:c43519e93d3e892364ad49"
+};
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="common.js"></script>
+    <script src="basetekniker.js"></script>
+</body>
+</html>
