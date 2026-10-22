@@ -81,6 +81,23 @@ function btVarsleLokalt(samling, liste) {
     if (lytter) setTimeout(function() { lytter(liste); }, 0);
 }
 
+// Viser en forståelig feil når skyen avviser en lesing eller lagring.
+// Manglende tilgang skyldes Firestore-reglene, ikke brukeren, og sies rett ut.
+function btSkyFeil(err, handling) {
+    console.error(handling + ':', err);
+    var nektet = !!err && (err.code === 'permission-denied' || /permission/i.test(err.message || ''));
+    var melding = nektet
+        ? 'Databasen (Firestore) gir ikke tilgang til baseteknikerdataene, så ingenting kan lagres eller hentes. ' +
+          'Reglene i Firebase Console må oppdateres – se «Firestore-regler» i README.'
+        : handling + '. Sjekk nettforbindelsen og prøv igjen.';
+    var banner = document.getElementById('btSkyFeil');
+    if (banner) {
+        banner.textContent = melding;
+        banner.style.display = '';
+    }
+    return melding;
+}
+
 // Abonnerer på en samling. Callback får hele lista hver gang noe endres,
 // også når en annen tekniker endrer noe.
 function btLytt(samling, callback, feilElementId) {
@@ -92,7 +109,7 @@ function btLytt(samling, callback, feilElementId) {
                 return data;
             }));
         }, function(err) {
-            console.error('Firestore-feil (' + samling + '):', err);
+            btSkyFeil(err, 'Kunne ikke hente data');
             var el = feilElementId && document.getElementById(feilElementId);
             if (el) el.innerHTML = '<p class="no-reports">Kunne ikke hente data fra skyen.</p>';
         });
@@ -113,8 +130,7 @@ function btLagre(samling, dok, callback) {
         docRef.set(data)
             .then(function() { if (callback) callback(docRef.id); })
             .catch(function(err) {
-                console.error('Kunne ikke lagre (' + samling + '):', err);
-                alert('Kunne ikke lagre. Prøv igjen.');
+                alert(btSkyFeil(err, 'Kunne ikke lagre'));
             });
         return;
     }
@@ -150,8 +166,7 @@ function btLagreMange(samling, dokumenter, callback) {
             return batch.commit();
         })).then(function() { if (callback) callback(); })
             .catch(function(err) {
-                console.error('Kunne ikke lagre (' + samling + '):', err);
-                alert('Kunne ikke lagre. Prøv igjen.');
+                alert(btSkyFeil(err, 'Kunne ikke lagre'));
             });
         return;
     }
@@ -177,8 +192,7 @@ function btSlett(samling, id, callback) {
         window.firestoreDb.collection(samling).doc(id).delete()
             .then(function() { if (callback) callback(); })
             .catch(function(err) {
-                console.error('Kunne ikke slette (' + samling + '):', err);
-                alert('Kunne ikke slette.');
+                alert(btSkyFeil(err, 'Kunne ikke slette'));
             });
         return;
     }
@@ -658,7 +672,7 @@ function btSikreMlgProsjekt() {
         // Spør serveren direkte, så en tom lokal cache aldri overskriver lagret arbeid.
         ref.get({ source: 'server' })
             .then(function(doc) { if (!doc.exists) return ref.set(standard); })
-            .catch(function(err) { console.warn('Kunne ikke sjekke MLG-reparasjonen:', err); });
+            .catch(function(err) { btSkyFeil(err, 'Kunne ikke sjekke MLG-reparasjonen'); });
         return;
     }
     var liste = btLesLokalt(BT_PROSJEKTER, '[]');
@@ -1952,7 +1966,7 @@ function btLastRapporter() {
                 btRenderRapportRegister();
             })
             .catch(function(err) {
-                console.error('Kunne ikke hente rapporter:', err);
+                btSkyFeil(err, 'Kunne ikke hente rapporter');
                 document.getElementById('btReportRegister').innerHTML =
                     '<p class="no-reports">Kunne ikke hente rapporter fra skyen.</p>';
             });
@@ -1967,8 +1981,7 @@ function btLagreRapport(rapport) {
         window.firestoreDb.collection(BT_RAPPORTER).add(rapport)
             .then(function() { btLastRapporter(); })
             .catch(function(err) {
-                console.error('Kunne ikke lagre rapport:', err);
-                alert('Kunne ikke lagre rapporten i skyen.');
+                alert(btSkyFeil(err, 'PDF-en er lastet ned, men rapporten kunne ikke lagres i registeret'));
             });
         return;
     }
@@ -2030,8 +2043,7 @@ function btRenderRapportRegister() {
                 window.firestoreDb.collection(BT_RAPPORTER).doc(rapport.id).delete()
                     .then(function() { btLastRapporter(); })
                     .catch(function(err) {
-                        console.error('Kunne ikke slette rapport:', err);
-                        alert('Kunne ikke slette rapporten.');
+                        alert(btSkyFeil(err, 'Kunne ikke slette rapporten'));
                     });
                 return;
             }

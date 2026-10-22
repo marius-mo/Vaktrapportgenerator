@@ -30,6 +30,30 @@ Firebase-config faller siden tilbake på `localStorage` i egen nettleser.
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
+## Firestore-regler
+
+Basetekniker-siden lagrer i egne samlinger, og Firestore-reglene må gi tilgang
+til dem. Ellers får teknikerne feilmelding når de lagrer, og tavla er tom.
+
+1. Gå til [Firebase Console](https://console.firebase.google.com/) →
+   prosjektet **vaktrapportgenerator** → **Firestore Database** → **Regler**.
+2. Behold regelen som allerede finnes for `vaktrapporter`, og legg til denne
+   blokka inne i `match /databases/{database}/documents { ... }`:
+
+   ```
+   match /{samling}/{dokument} {
+     allow read, write: if samling in
+       ['bt_saker', 'bt_prosjekter', 'bt_tools', 'bt_status', 'bt_rapporter'];
+   }
+   ```
+
+3. Trykk **Publiser**. Endringen gjelder etter et minutt eller to.
+
+Dette gir samme tilgangsnivå som `vaktrapporter` har i dag. Passordet på
+innloggingssiden ligger i klartekst i koden, så det er ingen reell sperre mot
+databasen. Ekte innlogging (Firebase Authentication) bør på plass før siden
+brukes til noe sensitivt.
+
 ## GitHub Pages – slik publiserer du
 
 1. **Opprett et nytt repo på GitHub**
