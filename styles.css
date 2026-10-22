@@ -2408,6 +2408,19 @@ header h1 {
   margin-bottom: var(--space-3);
 }
 
+/* To felt side om side, f.eks. Status base og Vedlegg */
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  margin-bottom: var(--space-3);
+}
+
+.form-row-2 .form-group {
+  margin-bottom: 0;
+}
+
 .form-group label {
   margin-bottom: var(--space-1);
 }
@@ -2715,6 +2728,10 @@ textarea.bt-input {
 
   .checkbox-group {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .form-row-2 {
+    grid-template-columns: 1fr;
   }
 
   /* iOS zoomer inn på felt med tekst under 16px, så feltene beholder 16px på mobil. */
