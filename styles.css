@@ -2358,3 +2358,391 @@ textarea.bt-input {
     margin: var(--space-3) var(--space-4) 0;
   }
 }
+
+/* ============================================
+   KOMPAKT OPPSETT
+   Strammere avstander og mindre knapper på begge rapportsidene,
+   så mer av skjemaet får plass på skjermen. Samme funksjon som før.
+   ============================================ */
+
+header {
+  padding: var(--space-3) var(--space-6);
+}
+
+header h1 {
+  font-size: var(--text-xl);
+}
+
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+#reportForm {
+  padding: var(--space-4) var(--space-5);
+}
+
+.form-section {
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.form-section h2,
+.register-section h2 {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+
+.form-row-3 {
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.form-group {
+  margin-bottom: var(--space-3);
+}
+
+.form-group label {
+  margin-bottom: var(--space-1);
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group textarea,
+.form-group select,
+#personDropdown,
+#personExtra,
+#btTeknikerDropdown,
+#btTeknikerExtra {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.form-group select {
+  padding-right: var(--space-8);
+}
+
+.form-group textarea {
+  min-height: 60px;
+}
+
+#statusBase {
+  min-height: 90px;
+}
+
+.file-upload-area,
+.tool-drop-zone {
+  padding: var(--space-3) var(--space-4);
+}
+
+.file-upload-area p {
+  margin: var(--space-1) 0;
+  font-size: var(--text-sm);
+}
+
+.person-selector-left {
+  gap: var(--space-2);
+}
+
+.selected-persons-list {
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.selected-person-item {
+  padding: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+/* Kontrollpunkter: flere per rad og lavere bokser */
+.checkbox-group {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-2);
+}
+
+.checkbox-group + .form-group {
+  margin-top: var(--space-3);
+}
+
+.checkbox-label {
+  padding: var(--space-2) var(--space-3);
+}
+
+.checkbox-custom {
+  width: 18px;
+  height: 18px;
+  margin-right: var(--space-2);
+}
+
+/* Helikoptre på operativ side */
+.helicopter-group {
+  gap: var(--space-2);
+}
+
+.helicopter-item {
+  padding: var(--space-3);
+}
+
+.helicopter-header {
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.helicopter-text {
+  min-height: 90px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.helicopter-status {
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+}
+
+.status-label {
+  padding: var(--space-1) var(--space-3);
+}
+
+/* Knapper */
+.btn {
+  padding: var(--space-2) var(--space-5);
+  min-height: 38px;
+  font-size: var(--text-sm);
+}
+
+.btn-small {
+  padding: var(--space-1) var(--space-3);
+  min-height: 30px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.form-actions {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+}
+
+.form-actions-note {
+  margin-top: var(--space-2);
+}
+
+/* Rapportregister og arkiv */
+.register-section {
+  padding: var(--space-4) var(--space-5);
+  margin-top: 0;
+}
+
+.register-filters {
+  margin-bottom: var(--space-3);
+}
+
+.report-item {
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.report-item-date {
+  font-size: var(--text-base);
+  margin-bottom: 0;
+}
+
+.report-item-actions {
+  gap: var(--space-2);
+}
+
+.report-group-title {
+  margin: var(--space-2) 0 var(--space-1);
+}
+
+.archive-link-wrapper {
+  padding: var(--space-3) var(--space-5);
+}
+
+.modal-box {
+  padding: var(--space-4);
+}
+
+.modal-header {
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+
+.modal-header h2 {
+  font-size: var(--text-lg);
+}
+
+.modal-footer {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+/* Basetekniker */
+.back-link-bar {
+  padding: var(--space-3) var(--space-5) 0;
+}
+
+.sky-feil-banner {
+  margin: var(--space-3) var(--space-5) 0;
+}
+
+.base-summary {
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.base-tile {
+  padding: var(--space-2) var(--space-3);
+}
+
+.base-tile-code {
+  font-size: var(--text-base);
+}
+
+.issue-filters {
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.issue-filter-chip {
+  padding: var(--space-1) var(--space-3);
+}
+
+.issue-filter-select {
+  padding: var(--space-1) var(--space-2);
+}
+
+.issue-board {
+  gap: var(--space-2);
+}
+
+.issue-card {
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+
+.issue-card-top,
+.issue-card-meta {
+  margin-bottom: var(--space-1);
+}
+
+.issue-status-btn {
+  padding: 2px var(--space-2);
+}
+
+.bt-card-list {
+  gap: var(--space-2);
+}
+
+.bt-card {
+  padding: var(--space-3) var(--space-4);
+}
+
+.bt-card-head {
+  margin-bottom: var(--space-2);
+}
+
+.bt-card-title,
+.bt-title-input {
+  font-size: var(--text-base);
+}
+
+.bt-field-grid {
+  gap: var(--space-2);
+}
+
+.bt-input {
+  padding: var(--space-1) var(--space-2);
+}
+
+textarea.bt-input {
+  min-height: 50px;
+}
+
+.bt-textarea-label {
+  margin-top: var(--space-2);
+}
+
+.bt-card-meta {
+  margin-top: var(--space-2);
+}
+
+.progress-row {
+  margin-top: var(--space-2);
+}
+
+.tool-drop-zone {
+  margin-bottom: var(--space-3);
+}
+
+.tool-list {
+  gap: var(--space-1);
+}
+
+.tool-item {
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+@media (max-width: 768px) {
+  header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  #reportForm {
+    padding: var(--space-3);
+  }
+
+  .form-section {
+    padding: var(--space-3);
+  }
+
+  .register-section {
+    padding: var(--space-3);
+  }
+
+  .checkbox-group {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  /* iOS zoomer inn på felt med tekst under 16px, så feltene beholder 16px på mobil. */
+  .form-group input[type="text"],
+  .form-group input[type="date"],
+  .form-group textarea,
+  .form-group select,
+  #personDropdown,
+  #personExtra,
+  #btTeknikerDropdown,
+  #btTeknikerExtra,
+  .bt-input,
+  .heli-input,
+  .helicopter-text,
+  .issue-filter-select {
+    font-size: 16px;
+  }
+
+  .back-link-bar {
+    padding: var(--space-3) var(--space-3) 0;
+  }
+
+  /* SERVICEABLE/UNSERVICEABLE gikk ut over kanten på smale skjermer. */
+  .helicopter-status {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .status-label {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .sky-feil-banner {
+    margin: var(--space-3) var(--space-3) 0;
+  }
+}
