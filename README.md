@@ -37,17 +37,29 @@ til dem. Ellers får teknikerne feilmelding når de lagrer, og tavla er tom.
 
 1. Gå til [Firebase Console](https://console.firebase.google.com/) →
    prosjektet **vaktrapportgenerator** → **Firestore Database** → **Regler**.
-2. Behold regelen som allerede finnes for `vaktrapporter`, og legg til denne
-   blokka inne i `match /databases/{database}/documents { ... }`:
+2. Erstatt alt i editoren med dette. Regelen for `vaktrapporter` må være med,
+   ellers slutter den operative generatoren å virke:
 
    ```
-   match /{samling}/{dokument} {
-     allow read, write: if samling in
-       ['bt_saker', 'bt_prosjekter', 'bt_tools', 'bt_status', 'bt_rapporter'];
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+
+       // Operativ vakt
+       match /vaktrapporter/{dokument} {
+         allow read, write: if true;
+       }
+
+       // Basetekniker
+       match /{samling}/{dokument} {
+         allow read, write: if samling in
+           ['bt_saker', 'bt_prosjekter', 'bt_tools', 'bt_status', 'bt_rapporter'];
+       }
+     }
    }
    ```
 
-3. Trykk **Publiser**. Endringen gjelder etter et minutt eller to.
+3. Trykk **Publish**. Endringen gjelder etter et minutt eller to.
 
 Dette gir samme tilgangsnivå som `vaktrapporter` har i dag. Passordet på
 innloggingssiden ligger i klartekst i koden, så det er ingen reell sperre mot
