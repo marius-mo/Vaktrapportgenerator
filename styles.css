@@ -2334,3 +2334,27 @@ textarea.bt-input {
     display: none;
   }
 }
+
+.sky-feil-banner {
+  margin: var(--space-4) var(--space-8) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-error-500);
+  border-left-width: 6px;
+  border-radius: var(--radius-md);
+  background: var(--color-error-50);
+  color: var(--color-error-700);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-relaxed);
+}
+
+[data-theme="dark"] .sky-feil-banner {
+  background: rgba(229, 57, 53, 0.12);
+  color: #ff8a80;
+}
+
+@media (max-width: 768px) {
+  .sky-feil-banner {
+    margin: var(--space-3) var(--space-4) 0;
+  }
+}
