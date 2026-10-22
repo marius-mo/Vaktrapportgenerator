@@ -2480,8 +2480,11 @@ header h1 {
   margin-right: var(--space-2);
 }
 
-/* Helikoptre på operativ side */
+/* Helikoptre på operativ side: alle fire på én linje, færre kolonner på smale skjermer */
 .helicopter-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
   gap: var(--space-2);
 }
 
@@ -2501,7 +2504,9 @@ header h1 {
 }
 
 .helicopter-status {
-  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: var(--space-1) var(--space-2);
   padding: var(--space-1) var(--space-2);
 }
 

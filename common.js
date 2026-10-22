@@ -141,3 +141,75 @@ function setDateInputToToday(inputId) {
     const day = String(today.getDate()).padStart(2, '0');
     dateInput.value = `${year}-${month}-${day}`;
 }
+
+// ============================================
+// TEKSTBOKSER SOM VOKSER MED INNHOLDET
+// ============================================
+// Alle tekstbokser blir så høye som teksten krever, så man slipper å scrolle
+// inne i feltet. De krymper igjen når tekst slettes, men aldri under min-height.
+(function() {
+    'use strict';
+
+    function tilpass(felt) {
+        // Skjulte felt har ingen høyde å måle; de tilpasses når de vises.
+        if (!felt.getClientRects().length) return;
+        felt.style.overflowY = 'hidden';
+        felt.style.height = 'auto';
+        var kant = felt.offsetHeight - felt.clientHeight;
+        felt.style.height = (felt.scrollHeight + kant) + 'px';
+    }
+
+    var planlagt = false;
+    function tilpassAlle() {
+        if (planlagt) return;
+        planlagt = true;
+        requestAnimationFrame(function() {
+            planlagt = false;
+            document.querySelectorAll('textarea').forEach(tilpass);
+        });
+    }
+
+    // Verdier satt fra kode (lastet rapport, utkast, sanntidsoppdatering)
+    // utløser ikke input-hendelser, så settet på value fanges opp direkte.
+    var verdi = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'value', {
+        configurable: true,
+        get: verdi.get,
+        set: function(ny) {
+            verdi.set.call(this, ny);
+            tilpassAlle();
+        }
+    });
+
+    document.addEventListener('input', function(e) {
+        if (e.target.tagName === 'TEXTAREA') tilpass(e.target);
+    });
+    document.addEventListener('reset', function() { setTimeout(tilpassAlle, 0); }, true);
+    window.addEventListener('resize', tilpassAlle);
+
+    function start() {
+        tilpassAlle();
+        // Nye felt (dialoger, kort) og felt som blir synlige (avhuket helikopter).
+        // Endringer på selve tekstboksene ignoreres, ellers ville høydeendringen
+        // vår utløse en ny runde i det uendelige.
+        new MutationObserver(function(endringer) {
+            for (var i = 0; i < endringer.length; i++) {
+                if (endringer[i].type === 'childList' || endringer[i].target.tagName !== 'TEXTAREA') {
+                    tilpassAlle();
+                    return;
+                }
+            }
+        }).observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'disabled']
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
+})();
