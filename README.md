@@ -40,7 +40,7 @@ ikke fra databasen, de vises bare ikke. Utkast eldre enn 14 dager slettes automa
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102j`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102k`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 
