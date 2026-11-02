@@ -673,8 +673,8 @@ function btByggBaseSeksjoner() {
                 '<textarea id="baseStatus-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="status"' +
                     ' placeholder="Status på basen nå: hangar, utstyr, bemanning, avtaler …"></textarea>' +
                 '<label for="baseTools-' + base + '">Tool status</label>' +
-                '<input type="text" id="baseTools-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="tools"' +
-                    ' placeholder="f.eks. Alle tools innenfor kalibrering, TQ-0051 due 01.11">' +
+                '<textarea id="baseTools-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="tools"' +
+                    ' placeholder="f.eks. Alle tools innenfor kalibrering. TQ-0051 due 01.11, sendt til kalibrering."></textarea>' +
             '</div>' +
             '<div class="bt-card-meta" id="baseMeta-' + base + '"></div>' +
             '<h3 class="report-group-title">Utestående saker</h3>' +
