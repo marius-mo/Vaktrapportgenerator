@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261102d">
+    <link rel="stylesheet" href="styles.css?v=20261102e">
 </head>
 <body>
     <script>
@@ -36,6 +36,7 @@
 
         <nav class="back-link-bar">
             <a class="back-link" href="index.html">&larr; Tilbake til operativ vakt</a>
+            <button type="button" id="ntkKnapp" class="btn-small btn-view">Nice to know</button>
         </nav>
 
         <div id="btSkyFeil" class="sky-feil-banner" role="alert" style="display: none;"></div>
@@ -82,24 +83,6 @@
                 </label>
             </div>
         </div>
-
-        <details class="form-section nice-to-know" id="niceToKnow">
-            <summary>
-                <span class="ntk-tittel">Nice to know</span>
-                <span class="ntk-hint">Kundenumre, telefonnumre og annen nyttig info</span>
-            </summary>
-            <div class="ntk-innhold">
-                <div id="ntkVisning" class="ntk-tekst"></div>
-                <textarea id="ntkTekst" class="bt-input" style="display: none;"
-                    placeholder="f.eks.&#10;Drivstoff Flesland: kundenr 12345, tlf 55 99 88 77&#10;Hangarvakt TOS: 77 66 55 44&#10;&#10;Ikke legg inn passord eller adgangskoder her."></textarea>
-                <div class="ntk-knapper">
-                    <button type="button" id="ntkRediger" class="btn-small btn-view">Rediger</button>
-                    <button type="button" id="ntkLagre" class="btn-small btn-view" style="display: none;">Lagre</button>
-                    <button type="button" id="ntkAvbryt" class="btn-small btn-pdf" style="display: none;">Avbryt</button>
-                    <span id="ntkMeta" class="ntk-meta"></span>
-                </div>
-            </div>
-        </details>
 
         <!-- Én seksjon per base (BGO, TOS, HFT), bygget av basetekniker.js -->
         <div id="baseSeksjoner"></div>
@@ -214,6 +197,26 @@
         </div>
     </div>
 
+    <div id="ntkModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>Nice to know <span class="modal-header-hint">Kundenumre, telefonnumre og annen nyttig info</span></h2>
+                <button type="button" id="ntkLukk" class="modal-close" aria-label="Lukk">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="ntkVisning" class="ntk-tekst"></div>
+                <textarea id="ntkTekst" class="bt-input" style="display: none;"
+                    placeholder="f.eks.&#10;Drivstoff Flesland: kundenr 12345, tlf 55 99 88 77&#10;Hangarvakt TOS: 77 66 55 44&#10;&#10;Ikke legg inn passord eller adgangskoder her."></textarea>
+            </div>
+            <div class="modal-footer ntk-knapper">
+                <span id="ntkMeta" class="ntk-meta"></span>
+                <button type="button" id="ntkRediger" class="btn btn-neutral">Rediger</button>
+                <button type="button" id="ntkLagre" class="btn btn-success" style="display: none;">Lagre</button>
+                <button type="button" id="ntkAvbryt" class="btn btn-neutral" style="display: none;">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase: erstatt verdiene under med din egen config fra Firebase Console -->
     <script>
     window.FIREBASE_CONFIG = {
@@ -228,7 +231,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="common.js?v=20261102d"></script>
-    <script src="basetekniker.js?v=20261102d"></script>
+    <script src="common.js?v=20261102e"></script>
+    <script src="basetekniker.js?v=20261102e"></script>
 </body>
 </html>
