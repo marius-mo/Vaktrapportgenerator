@@ -368,6 +368,8 @@ function btSakKortHtml(sak) {
                 '<span class="issue-chip">' + escapeHtml(sak.omraade || '-') + '</span>' +
                 '<span class="issue-chip">' + escapeHtml(sak.kategori || '-') + '</span>' +
                 (sak.ansvarlig ? '<span class="issue-chip">' + escapeHtml(sak.ansvarlig) + '</span>' : '') +
+                (sak.vedlegg && sak.vedlegg.length ? '<span class="issue-chip issue-chip-vedlegg">' +
+                    sak.vedlegg.length + ' vedlegg</span>' : '') +
                 '<span class="issue-age">' + (sak.status === 'Lukket' ? 'Lukket' : 'Åpen i ' + dager + ' d') + '</span>' +
             '</div>' +
         '</div>' +
@@ -390,6 +392,10 @@ function btSakKortHtml(sak) {
 
 function btRenderIssueBoard() {
     btOppdaterLiveBadge();
+    if (btRedigererSakId && document.getElementById('issueModal').style.display !== 'none') {
+        btRenderVedlegg();
+        btHentVedleggForVisning();
+    }
     var filtrert = document.getElementById('filterShowClosed').checked ||
         !!document.getElementById('filterKategori').value;
 
@@ -559,6 +565,11 @@ function btAapneSakModal(id, nyBase) {
     }
     document.getElementById('issueUtkastInfo').style.display = gjenopprettet ? '' : 'none';
 
+    btVentendeVedlegg = [];
+    btSettLagrerSak(false);
+    btRenderVedlegg();
+    btHentVedleggForVisning();
+
     modal.style.display = 'flex';
     document.getElementById('issueTittel').focus();
 }
@@ -567,6 +578,9 @@ function btLukkSakModal() {
     document.getElementById('issueModal').style.display = 'none';
     btRedigererSakId = null;
     btSakStartverdier = null;
+    btVentendeVedlegg = [];
+    btVedleggCache = {};
+    btFrigjorVedleggUrler();
 }
 
 // Lukking brukeren ber om. Et klikk utenfor vinduet (f.eks. når man klikker seg
@@ -600,6 +614,7 @@ function btLesSakSkjema() {
 }
 
 function btSakSkjemaEndret() {
+    if (btVentendeVedlegg.length) return true;
     return !!btSakStartverdier && JSON.stringify(btLesSakSkjema()) !== JSON.stringify(btSakStartverdier);
 }
 
@@ -638,7 +653,311 @@ function btGjenopprettSakUtkast() {
     btAapneSakModal(utkast.sakId || null, utkast.felt.issueBase);
 }
 
+// ============================================
+// VEDLEGG (bilder og filer på en sak)
+// ============================================
+// Firebase Storage krever betalt abonnement, så filene lagres i Firestore.
+// Et dokument kan være maks 1 MB, så hver fil deles opp i biter i samlingen
+// bt_vedlegg (dokument-id «<vedlegg-id>-<nr>»). Saken har bare en liste med
+// navn, type og størrelse, så sakslisten forblir rask. Bilder gjøres mindre
+// før opplasting. Vedlegg lastes opp når saken lagres.
+
+const BT_VEDLEGG = 'bt_vedlegg';
+const BT_VEDLEGG_MAKS_BYTES = 5 * 1024 * 1024;
+const BT_VEDLEGG_MAKS_ANTALL = 10;
+const BT_VEDLEGG_DEL_TEGN = 800 * 1024;   // base64-tegn per bit (ca. 600 kB fil)
+const BT_BILDE_MAKS_PX = 1600;
+// Bare disse vises i nettleseren. Alt annet lastes ned som fil, så en opplastet
+// HTML- eller SVG-fil aldri kan kjøre skript på siden.
+const BT_VEDLEGG_VISBARE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+const BT_VEDLEGG_BILDER = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+var btVentendeVedlegg = [];   // valgt i vinduet, ikke lastet opp ennå
+var btVedleggUrler = [];      // blob-adresser som frigjøres når vinduet lukkes
+var btLagrerSak = false;
+
+function btFormatStorrelse(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' kB';
+    return (bytes / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB';
+}
+
+function btErBildeType(type) {
+    return BT_VEDLEGG_BILDER.indexOf(type) !== -1;
+}
+
+function btLagBlobUrl(blob) {
+    var url = URL.createObjectURL(blob);
+    btVedleggUrler.push(url);
+    return url;
+}
+
+function btFrigjorVedleggUrler() {
+    btVedleggUrler.forEach(function(url) { URL.revokeObjectURL(url); });
+    btVedleggUrler = [];
+}
+
+function btBlobTilBase64(blob) {
+    return new Promise(function(resolve, reject) {
+        var leser = new FileReader();
+        leser.onload = function() { resolve(String(leser.result).split(',')[1] || ''); };
+        leser.onerror = function() { reject(leser.error); };
+        leser.readAsDataURL(blob);
+    });
+}
+
+function btBase64TilBlob(base64, type) {
+    var binaer = atob(base64);
+    var bytes = new Uint8Array(binaer.length);
+    for (var i = 0; i < binaer.length; i++) bytes[i] = binaer.charCodeAt(i);
+    return new Blob([bytes], { type: type });
+}
+
+// Gjør bilder mindre (maks 1600 px, JPEG). Bilder nettleseren ikke kan lese
+// (f.eks. HEIC i Chrome), og andre filer, lastes opp som de er.
+function btKomprimerBilde(fil) {
+    if (['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].indexOf(fil.type) === -1) {
+        return Promise.resolve({ blob: fil, navn: fil.name, type: fil.type || 'application/octet-stream' });
+    }
+    return new Promise(function(resolve) {
+        var url = URL.createObjectURL(fil);
+        var bilde = new Image();
+        bilde.onload = function() {
+            var skala = Math.min(1, BT_BILDE_MAKS_PX / Math.max(bilde.naturalWidth, bilde.naturalHeight));
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bilde.naturalWidth * skala));
+            canvas.height = Math.max(1, Math.round(bilde.naturalHeight * skala));
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bilde, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(function(blob) {
+                if (!blob || (blob.size >= fil.size && fil.type === 'image/jpeg')) {
+                    resolve({ blob: fil, navn: fil.name, type: fil.type });
+                    return;
+                }
+                resolve({ blob: blob, navn: fil.name.replace(/\.[^.]*$/, '') + '.jpg', type: 'image/jpeg' });
+            }, 'image/jpeg', 0.82);
+        };
+        bilde.onerror = function() {
+            URL.revokeObjectURL(url);
+            resolve({ blob: fil, navn: fil.name, type: fil.type || 'application/octet-stream' });
+        };
+        bilde.src = url;
+    });
+}
+
+function btVedleggPaaSak(sakId) {
+    var sak = sakId ? btSaker.find(function(s) { return s.id === sakId; }) : null;
+    return (sak && sak.vedlegg) ? sak.vedlegg : [];
+}
+
+function btVelgVedlegg(filer) {
+    filer = Array.prototype.slice.call(filer || []);
+    if (!filer.length) return;
+    var plass = BT_VEDLEGG_MAKS_ANTALL - btVedleggPaaSak(btRedigererSakId).length - btVentendeVedlegg.length;
+    if (filer.length > plass) {
+        alert('En sak kan ha maks ' + BT_VEDLEGG_MAKS_ANTALL + ' vedlegg.' +
+            (plass > 0 ? ' Bare de ' + plass + ' første blir lagt til.' : ''));
+        filer = filer.slice(0, Math.max(0, plass));
+    }
+    var sakVedValg = btRedigererSakId;
+    Promise.all(filer.map(btKomprimerBilde)).then(function(resultater) {
+        if (document.getElementById('issueModal').style.display === 'none' || sakVedValg !== btRedigererSakId) return;
+        var forStore = [];
+        resultater.forEach(function(r) {
+            if (r.blob.size > BT_VEDLEGG_MAKS_BYTES) {
+                forStore.push(r.navn + ' (' + btFormatStorrelse(r.blob.size) + ')');
+                return;
+            }
+            btVentendeVedlegg.push({
+                id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+                navn: r.navn || 'fil', type: r.type, storrelse: r.blob.size,
+                blob: r.blob, url: btLagBlobUrl(r.blob)
+            });
+        });
+        if (forStore.length) {
+            alert('For store filer (maks ' + btFormatStorrelse(BT_VEDLEGG_MAKS_BYTES) + '):\n' + forStore.join('\n') +
+                '\n\nLegg store dokumenter i SharePoint og skriv hvor de ligger i saken.');
+        }
+        btRenderVedlegg();
+    });
+}
+
+// Lenke som viser eller laster ned et vedlegg. Ukjente typer lastes alltid ned.
+function btVedleggLenke(url, navn, type, innhold, klasse) {
+    var visbar = BT_VEDLEGG_VISBARE.indexOf(type) !== -1;
+    return '<a class="' + klasse + '" href="' + url + '"' +
+        (visbar ? ' target="_blank" rel="noopener"' : ' download="' + escapeHtml(navn) + '"') +
+        ' title="' + escapeHtml(navn) + '">' + innhold + '</a>';
+}
+
+function btVedleggElementHtml(v, ventende) {
+    var bilde = btErBildeType(v.type);
+    var forhand = bilde
+        ? (v.url ? '<img src="' + v.url + '" alt="">' : '<span class="vedlegg-ikon">Laster…</span>')
+        : '<span class="vedlegg-ikon">' + escapeHtml((v.navn.split('.').pop() || 'fil').slice(0, 4).toUpperCase()) + '</span>';
+    var tekst = '<span class="vedlegg-navn">' + escapeHtml(v.navn) + '</span>' +
+        '<span class="vedlegg-info">' + btFormatStorrelse(v.storrelse) +
+        (ventende ? ' · lastes opp ved Lagre' : (v.av ? ' · ' + escapeHtml(v.av) : '')) + '</span>';
+    var innhold = '<span class="vedlegg-forhand">' + forhand + '</span><span class="vedlegg-tekst">' + tekst + '</span>';
+    return '<li class="vedlegg-element' + (ventende ? ' er-ventende' : '') + '" data-vedlegg-id="' + escapeHtml(v.id) + '">' +
+        (v.url ? btVedleggLenke(v.url, v.navn, v.type, innhold, 'vedlegg-lenke')
+               : '<span class="vedlegg-lenke er-lasting">' + innhold + '</span>') +
+        '<button type="button" class="vedlegg-fjern" data-vedlegg-id="' + escapeHtml(v.id) + '"' +
+            ' data-ventende="' + (ventende ? '1' : '') + '" aria-label="Fjern ' + escapeHtml(v.navn) + '">&times;</button>' +
+    '</li>';
+}
+
+function btRenderVedlegg() {
+    var liste = document.getElementById('issueVedleggListe');
+    if (!liste) return;
+    var lagrede = btVedleggPaaSak(btRedigererSakId).map(function(v) {
+        return Object.assign({}, v, { url: btVedleggCache[v.id] || '' });
+    });
+    liste.innerHTML = lagrede.map(function(v) { return btVedleggElementHtml(v, false); }).join('') +
+        btVentendeVedlegg.map(function(v) { return btVedleggElementHtml(v, true); }).join('');
+    var antall = lagrede.length + btVentendeVedlegg.length;
+    document.getElementById('issueVedleggTom').style.display = antall ? 'none' : '';
+    var full = antall >= BT_VEDLEGG_MAKS_ANTALL;
+    document.querySelectorAll('.vedlegg-velg').forEach(function(knapp) { knapp.classList.toggle('is-disabled', full); });
+    document.querySelectorAll('.vedlegg-velg input').forEach(function(input) { input.disabled = full; });
+}
+
+// Henter lagrede vedlegg for saken som er åpen, så de kan vises og lastes ned.
+var btVedleggCache = {};
+function btHentVedleggForVisning() {
+    var sakId = btRedigererSakId;
+    btVedleggPaaSak(sakId).forEach(function(v) {
+        if (btVedleggCache[v.id]) return;
+        btHentVedleggBlob(v).then(function(blob) {
+            if (sakId !== btRedigererSakId) return;
+            // Typen styres her, ikke av det som er lagret, så ukjente filer aldri vises som nettside.
+            var trygg = BT_VEDLEGG_VISBARE.indexOf(v.type) !== -1 ? v.type : 'application/octet-stream';
+            btVedleggCache[v.id] = btLagBlobUrl(blob.type === trygg ? blob : new Blob([blob], { type: trygg }));
+            btRenderVedlegg();
+        }).catch(function(err) {
+            console.error('Kunne ikke hente vedlegg', err);
+            var el = document.querySelector('.vedlegg-element[data-vedlegg-id="' + v.id + '"] .vedlegg-info');
+            if (el) el.textContent = 'Kunne ikke hentes';
+        });
+    });
+}
+
+function btVedleggDelId(vedleggId, nr) {
+    return vedleggId + '-' + nr;
+}
+
+function btSkrivVedleggDel(id, data) {
+    if (btHarSky()) return window.firestoreDb.collection(BT_VEDLEGG).doc(id).set(data);
+    return new Promise(function(resolve, reject) {
+        try {
+            var alle = JSON.parse(localStorage.getItem(BT_VEDLEGG) || '{}');
+            alle[id] = data;
+            localStorage.setItem(BT_VEDLEGG, JSON.stringify(alle));
+            resolve();
+        } catch (e) { reject(e); }
+    });
+}
+
+function btLesVedleggDel(id) {
+    if (btHarSky()) {
+        return window.firestoreDb.collection(BT_VEDLEGG).doc(id).get().then(function(doc) {
+            if (!doc.exists) throw new Error('Mangler del ' + id);
+            return doc.data().data;
+        });
+    }
+    var alle = JSON.parse(localStorage.getItem(BT_VEDLEGG) || '{}');
+    return alle[id] ? Promise.resolve(alle[id].data) : Promise.reject(new Error('Mangler del ' + id));
+}
+
+function btSlettVedleggData(v) {
+    var ider = [];
+    for (var i = 0; i < (v.deler || 1); i++) ider.push(btVedleggDelId(v.id, i));
+    if (btHarSky()) {
+        return Promise.all(ider.map(function(id) {
+            return window.firestoreDb.collection(BT_VEDLEGG).doc(id).delete();
+        })).catch(function(err) { console.error('Kunne ikke slette vedleggsdata', err); });
+    }
+    try {
+        var alle = JSON.parse(localStorage.getItem(BT_VEDLEGG) || '{}');
+        ider.forEach(function(id) { delete alle[id]; });
+        localStorage.setItem(BT_VEDLEGG, JSON.stringify(alle));
+    } catch (e) { /* lagring ikke tilgjengelig */ }
+    return Promise.resolve();
+}
+
+function btHentVedleggBlob(v) {
+    var deler = [];
+    for (var i = 0; i < (v.deler || 1); i++) deler.push(btLesVedleggDel(btVedleggDelId(v.id, i)));
+    return Promise.all(deler).then(function(biter) { return btBase64TilBlob(biter.join(''), v.type); });
+}
+
+// Laster opp ventende vedlegg og gir tilbake listen som lagres på saken.
+function btLastOppVedlegg(sakId, ventende) {
+    var av = btAktivTekniker();
+    return Promise.all(ventende.map(function(v) {
+        return btBlobTilBase64(v.blob).then(function(base64) {
+            var biter = [];
+            for (var i = 0; i < base64.length; i += BT_VEDLEGG_DEL_TEGN) biter.push(base64.slice(i, i + BT_VEDLEGG_DEL_TEGN));
+            if (!biter.length) biter.push('');
+            return Promise.all(biter.map(function(bit, nr) {
+                return btSkrivVedleggDel(btVedleggDelId(v.id, nr), {
+                    vedleggId: v.id, sakId: sakId, del: nr, antallDeler: biter.length, data: bit
+                });
+            })).then(function() {
+                return { id: v.id, navn: v.navn, type: v.type, storrelse: v.storrelse,
+                         deler: biter.length, lastetOpp: btNaa(), av: av };
+            });
+        });
+    }));
+}
+
+function btVedleggFeilmelding(err) {
+    var nektet = !!err && (err.code === 'permission-denied' || /permission/i.test(err.message || ''));
+    if (nektet) {
+        return 'Databasen avviste opplastingen av vedlegg. Firestore-reglene må få med samlingen ' +
+            '«bt_vedlegg» – se «Firestore-regler» i README. Saken er ikke lagret.';
+    }
+    if (err && /quota/i.test(err.name + ' ' + err.message)) {
+        return 'Ikke plass til vedlegget i nettleseren. Saken er ikke lagret.';
+    }
+    return 'Kunne ikke laste opp vedlegg. Sjekk nettforbindelsen og prøv igjen. Saken er ikke lagret.';
+}
+
+function btFjernVedlegg(vedleggId, ventende) {
+    if (ventende) {
+        btVentendeVedlegg = btVentendeVedlegg.filter(function(v) { return v.id !== vedleggId; });
+        btRenderVedlegg();
+        return;
+    }
+    var sak = btSaker.find(function(s) { return s.id === btRedigererSakId; });
+    var v = sak && (sak.vedlegg || []).find(function(x) { return x.id === vedleggId; });
+    if (!v || !confirm('Slette vedlegget «' + v.navn + '» fra saken? Det kan ikke angres.')) return;
+    var oppdatert = Object.assign({}, sak, {
+        vedlegg: sak.vedlegg.filter(function(x) { return x.id !== vedleggId; }),
+        oppdatert: btNaa()
+    });
+    btSaker = btSaker.map(function(s) { return s.id === oppdatert.id ? oppdatert : s; });
+    btLagre(BT_SAKER, oppdatert, function() { btSlettVedleggData(v); });
+    btRenderVedlegg();
+}
+
+function btNySakId() {
+    return btHarSky() ? window.firestoreDb.collection(BT_SAKER).doc().id : btNyId();
+}
+
+function btSettLagrerSak(aktiv) {
+    btLagrerSak = aktiv;
+    var knapp = document.getElementById('issueSaveBtn');
+    knapp.disabled = aktiv;
+    knapp.textContent = aktiv ? 'Laster opp…' : 'Lagre';
+}
+
 function btLagreFraModal() {
+    if (btLagrerSak) return;
     var tittel = document.getElementById('issueTittel').value.trim();
     if (!tittel) {
         alert('Saken må ha en tittel.');
@@ -646,6 +965,25 @@ function btLagreFraModal() {
         return;
     }
 
+    var sakId = btRedigererSakId || btNySakId();
+    var ventende = btVentendeVedlegg.slice();
+    if (!ventende.length) {
+        btLagreSak(sakId, []);
+        return;
+    }
+    btSettLagrerSak(true);
+    btLastOppVedlegg(sakId, ventende).then(function(nye) {
+        btSettLagrerSak(false);
+        btLagreSak(sakId, nye);
+    }).catch(function(err) {
+        console.error('Opplasting feilet', err);
+        btSettLagrerSak(false);
+        alert(btVedleggFeilmelding(err));
+    });
+}
+
+function btLagreSak(sakId, nyeVedlegg) {
+    var tittel = document.getElementById('issueTittel').value.trim();
     var naa = btNaa();
     var eksisterende = btRedigererSakId
         ? btSaker.find(function(s) { return s.id === btRedigererSakId; })
@@ -655,7 +993,8 @@ function btLagreFraModal() {
     var base = document.getElementById('issueBase').value;
 
     var sak = {
-        id: btRedigererSakId || undefined,
+        id: sakId,
+        vedlegg: ((eksisterende && eksisterende.vedlegg) || []).concat(nyeVedlegg || []),
         tittel: tittel,
         omraade: document.getElementById('issueOmraade').value,
         kategori: document.getElementById('issueKategori').value,
@@ -1058,7 +1397,8 @@ function btSakSnapshot(sak) {
         sisteLoggTid: sisteLogg ? sisteLogg.tid : '',
         logg: logg.map(function(post) {
             return { tid: post.tid || '', av: post.av || '', tekst: post.tekst };
-        })
+        }),
+        vedlegg: (sak.vedlegg || []).map(function(v) { return v.navn; })
     };
 }
 
@@ -1205,6 +1545,10 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
             tekst((meta ? meta + ': ' : '') + post.tekst,
                 { storrelse: 8, farge: textSecondary, innrykk: 2, linjeHoyde: 3.8 });
         });
+        if (sak.vedlegg && sak.vedlegg.length) {
+            tekst('Vedlegg: ' + sak.vedlegg.join(', '),
+                { storrelse: 8, stil: 'italic', farge: textSecondary, innrykk: 2, linjeHoyde: 3.8 });
+        }
     }
 
     function tom(melding) {
@@ -1717,12 +2061,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target === this) btForsokLukkSakModal(true);
     });
     document.getElementById('issueSaveBtn').addEventListener('click', btLagreFraModal);
+    document.querySelectorAll('.vedlegg-velg').forEach(function(knapp) {
+        knapp.addEventListener('click', function() {
+            var input = document.getElementById(knapp.getAttribute('data-input'));
+            if (!input.disabled) input.click();
+        });
+    });
+    ['issueVedleggBilde', 'issueVedleggFil'].forEach(function(id) {
+        document.getElementById(id).addEventListener('change', function() {
+            btVelgVedlegg(this.files);
+            this.value = '';
+        });
+    });
+    document.getElementById('issueVedleggListe').addEventListener('click', function(e) {
+        var knapp = e.target.closest('.vedlegg-fjern');
+        if (knapp) btFjernVedlegg(knapp.getAttribute('data-vedlegg-id'), !!knapp.getAttribute('data-ventende'));
+    });
     document.getElementById('issueModal').addEventListener('input', btLagreSakUtkast);
     document.getElementById('issueModal').addEventListener('change', btLagreSakUtkast);
     document.getElementById('issueDeleteBtn').addEventListener('click', function() {
         if (!btRedigererSakId) return;
         if (!confirm('Slette denne saken permanent? Bruk heller status «Lukket» hvis den er ferdig.')) return;
+        var vedlegg = btVedleggPaaSak(btRedigererSakId);
         btSlett(BT_SAKER, btRedigererSakId, function() {
+            vedlegg.forEach(btSlettVedleggData);
             btSlettSakUtkast();
             btLukkSakModal();
         });
