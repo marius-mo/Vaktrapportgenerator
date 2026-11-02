@@ -1,46 +1,35 @@
 // ============================================
 // BASETEKNIKER - LEVENDE STATUSTAVLE OG VAKTRAPPORT
 // ============================================
-// Basetekniker har ansvar for alle tre baser (BGO, TOS, HFT). Saker,
-// større reparasjoner, tools-due og ettersyn lever videre mellom vakter og
-// deles mellom teknikere. Vaktrapporten er et øyeblikksbilde ved vaktslutt.
+// Basetekniker har ansvar for alle tre baser (BGO, TOS, HFT). Basestatus,
+// saker og ettersyn lever videre mellom vakter og deles mellom teknikere.
+// Vaktrapporten er et øyeblikksbilde ved vaktslutt.
 
 const BT_BASER = ['BGO', 'TOS', 'HFT'];
 const BT_HELIKOPTRE = ['LN-OXH', 'LN-OXI', 'LN-OXJ', 'LN-OXK'];
 const BT_SAK_STATUSER = ['Åpen', 'Pågår', 'Venter på deler', 'Lukket'];
 const BT_AAPNE_STATUSER = ['Åpen', 'Pågår', 'Venter på deler'];
-const BT_PROSJEKT_STATUSER = ['Planlagt', 'Pågår', 'Venter på deler', 'Ferdig'];
-const BT_ETTERSYN_STATUSER = ['Pågår', 'Venter på deler', 'Ferdig'];
+const BT_ETTERSYN_STATUSER = ['Planlegging', 'Pågår', 'Venter på deler', 'Ferdig'];
 
 // Firestore-samlinger. Uten Firebase brukes samme navn som nøkler i localStorage.
+// bt_status holder både basestatus (base-BGO osv.) og ettersyn.
 const BT_SAKER = 'bt_saker';
-const BT_PROSJEKTER = 'bt_prosjekter';
-const BT_TOOLS = 'bt_tools';
 const BT_STATUS = 'bt_status';
 const BT_RAPPORTER = 'bt_rapporter';
+// Større reparasjoner lå her før de ble slått sammen med ettersyn.
+const BT_PROSJEKTER = 'bt_prosjekter';
 
-const BT_ETTERSYN_ID = 'ettersyn';
-const BT_MLG_ID = 'oxi-mlg-repair';
+// Brukes bare når eldre rapporter med tools-oversikt lastes ned på nytt.
 const BT_TOOLS_VARSEL_DAGER = 30;
-
-// Bibliotekene for filimport lastes først når noen faktisk drar inn en fil.
-const BT_PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const BT_PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const BT_XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
 // Basene het tidligere Bergen/Tromsø/Hammerfest på denne siden.
 const BT_GAMLE_BASENAVN = { 'Bergen': 'BGO', 'Tromsø': 'TOS', 'Hammerfest': 'HFT' };
 
 var btSaker = [];
-var btProsjekter = [];
-var btTools = [];
-var btEttersyn = {};
+var btBaseStatus = {};
+var btEttersynListe = [];
 var btRapporter = [];
 var btRedigererSakId = null;
-var btRedigererToolId = null;
-var btImportRader = [];
-var btImportFilnavn = '';
-var btToolMelding = '';
 var btLokaleLyttere = {};
 
 // ============================================
@@ -148,45 +137,6 @@ function btLagre(samling, dok, callback) {
     if (callback) callback(data.id);
 }
 
-function btLagreMange(samling, dokumenter, callback) {
-    if (btHarSky()) {
-        var db = window.firestoreDb;
-        var ref = db.collection(samling);
-        // Firestore tillater maks 500 skrivinger per batch.
-        var biter = [];
-        for (var i = 0; i < dokumenter.length; i += 400) biter.push(dokumenter.slice(i, i + 400));
-        Promise.all(biter.map(function(bit) {
-            var batch = db.batch();
-            bit.forEach(function(dok) {
-                var data = Object.assign({}, dok);
-                var id = data.id;
-                delete data.id;
-                batch.set(id ? ref.doc(id) : ref.doc(), data);
-            });
-            return batch.commit();
-        })).then(function() { if (callback) callback(); })
-            .catch(function(err) {
-                alert(btSkyFeil(err, 'Kunne ikke lagre'));
-            });
-        return;
-    }
-
-    var liste = btLesLokalt(samling, '[]');
-    dokumenter.forEach(function(dok) {
-        var data = Object.assign({}, dok);
-        if (!data.id) data.id = btNyId();
-        var index = liste.findIndex(function(x) { return x.id === data.id; });
-        if (index === -1) {
-            liste.unshift(data);
-        } else {
-            liste[index] = data;
-        }
-    });
-    btSkrivLokalt(samling, liste);
-    btVarsleLokalt(samling, liste);
-    if (callback) callback();
-}
-
 function btSlett(samling, id, callback) {
     if (btHarSky()) {
         window.firestoreDb.collection(samling).doc(id).delete()
@@ -258,9 +208,18 @@ function btStatusKlasse(status) {
         case 'Venter på deler': return 'waiting';
         case 'Lukket':
         case 'Ferdig': return 'closed';
-        case 'Planlagt': return 'planned';
+        case 'Planlagt':
+        case 'Planlegging': return 'planned';
         default: return 'neutral';
     }
+}
+
+// Brukes når eldre rapporter med tools-oversikt lastes ned på nytt.
+function btToolDagerTekst(dager) {
+    if (dager === null) return 'Ingen dato';
+    if (dager < 0) return 'Forfalt ' + Math.abs(dager) + ' d';
+    if (dager === 0) return 'Due i dag';
+    return dager + ' d';
 }
 
 function btBaseValg(valgt, medTomTekst) {
@@ -320,14 +279,13 @@ function btErAapen(sak) {
     return BT_AAPNE_STATUSER.indexOf(sak.status) !== -1;
 }
 
-function btSynligeSaker() {
+function btSynligeSaker(iBase) {
     var visLukkede = document.getElementById('filterShowClosed').checked;
-    var base = document.getElementById('filterBase').value;
     var kategori = document.getElementById('filterKategori').value;
 
     return btSaker.filter(function(sak) {
+        if (!iBase(sak.base)) return false;
         if (!visLukkede && sak.status === 'Lukket') return false;
-        if (base && sak.base !== base) return false;
         if (kategori && sak.kategori !== kategori) return false;
         return true;
     });
@@ -366,7 +324,6 @@ function btSakKortHtml(sak) {
                 (sak.prioritet === 'Høy' ? '<span class="issue-badge badge-high">Høy</span>' : '') +
             '</div>' +
             '<div class="issue-card-meta">' +
-                '<span class="issue-chip issue-chip-base">' + escapeHtml(sak.base || '-') + '</span>' +
                 '<span class="issue-chip">' + escapeHtml(sak.omraade || '-') + '</span>' +
                 '<span class="issue-chip">' + escapeHtml(sak.kategori || '-') + '</span>' +
                 (sak.ansvarlig ? '<span class="issue-chip">' + escapeHtml(sak.ansvarlig) + '</span>' : '') +
@@ -386,78 +343,39 @@ function btSakKortHtml(sak) {
 }
 
 function btRenderIssueBoard() {
-    var board = document.getElementById('issueBoard');
-    if (!board) return;
-
-    btRenderSakOppsummering();
     btOppdaterLiveBadge();
+    var filtrert = document.getElementById('filterShowClosed').checked ||
+        !!document.getElementById('filterKategori').value;
 
-    var saker = btSorterSaker(btSynligeSaker());
-    if (saker.length === 0) {
-        board.innerHTML = '<p class="no-reports">Ingen saker som matcher filteret. Trykk «Ny sak» for å legge til.</p>';
-        return;
-    }
-
-    // Med «Alle baser» grupperes sakene per base, så hver base kan følges opp for seg.
-    var valgtBase = document.getElementById('filterBase').value;
-    var html = '';
-    if (valgtBase) {
-        html = saker.map(btSakKortHtml).join('');
-    } else {
-        BT_BASER.forEach(function(base) {
-            var gruppe = saker.filter(function(s) { return s.base === base; });
-            if (gruppe.length === 0) return;
-            html += '<h3 class="report-group-title">' + base + ' (' + gruppe.length + ')</h3>' +
-                gruppe.map(btSakKortHtml).join('');
-        });
-        var utenBase = saker.filter(function(s) { return BT_BASER.indexOf(s.base) === -1; });
-        if (utenBase.length) {
-            html += '<h3 class="report-group-title">Uten base (' + utenBase.length + ')</h3>' +
-                utenBase.map(btSakKortHtml).join('');
-        }
-    }
-    board.innerHTML = html;
-
-    board.querySelectorAll('.issue-status-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            btEndreStatus(this.getAttribute('data-id'), this.getAttribute('data-status'));
-        });
+    BT_BASER.forEach(function(base) {
+        var board = document.getElementById('issueBoard-' + base);
+        if (!board) return;
+        btRenderBaseOppsummering(base);
+        var saker = btSorterSaker(btSynligeSaker(function(b) { return b === base; }));
+        board.innerHTML = saker.length
+            ? saker.map(btSakKortHtml).join('')
+            : '<p class="no-reports">' + (filtrert ? 'Ingen saker som matcher filteret.' : 'Ingen utestående saker.') + '</p>';
     });
-    board.querySelectorAll('.issue-open-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            btAapneSakModal(this.getAttribute('data-id'));
-        });
-    });
+
+    var utenBase = btSorterSaker(btSynligeSaker(function(b) { return BT_BASER.indexOf(b) === -1; }));
+    var annet = document.getElementById('baseSeksjon-annet');
+    if (annet) {
+        annet.style.display = utenBase.length ? '' : 'none';
+        document.getElementById('issueBoard-annet').innerHTML = utenBase.map(btSakKortHtml).join('');
+    }
 }
 
-function btRenderSakOppsummering() {
-    var div = document.getElementById('issueBaseSummary');
-    if (!div) return;
-    var valgt = document.getElementById('filterBase').value;
-
-    div.innerHTML = BT_BASER.map(function(base) {
-        var aapne = btSaker.filter(function(s) { return s.base === base && btErAapen(s); });
-        var hoy = aapne.filter(function(s) { return s.prioritet === 'Høy'; }).length;
-        var venter = aapne.filter(function(s) { return s.status === 'Venter på deler'; }).length;
-        var under = [hoy ? hoy + ' høy prioritet' : 'Ingen høy prioritet'];
-        if (venter) under.push(venter + ' venter på deler');
-
-        return '<button type="button" class="base-tile' + (valgt === base ? ' is-active' : '') +
-            (hoy ? ' tone-bad' : '') + '" data-base="' + base + '">' +
-            '<span class="base-tile-code">' + base + '</span>' +
-            '<span class="base-tile-main">' + (aapne.length === 1 ? '1 åpen sak' : aapne.length + ' åpne saker') + '</span>' +
-            '<span class="base-tile-sub">' + escapeHtml(under.join(' · ')) + '</span>' +
-        '</button>';
-    }).join('');
-
-    div.querySelectorAll('.base-tile').forEach(function(tile) {
-        tile.addEventListener('click', function() {
-            var filter = document.getElementById('filterBase');
-            var base = this.getAttribute('data-base');
-            filter.value = filter.value === base ? '' : base;
-            btRenderIssueBoard();
-        });
-    });
+function btRenderBaseOppsummering(base) {
+    var el = document.getElementById('baseOppsummering-' + base);
+    if (!el) return;
+    var aapne = btSaker.filter(function(s) { return s.base === base && btErAapen(s); });
+    var hoy = aapne.filter(function(s) { return s.prioritet === 'Høy'; }).length;
+    var venter = aapne.filter(function(s) { return s.status === 'Venter på deler'; }).length;
+    var deler = [aapne.length === 0 ? 'ingen åpne saker' : (aapne.length === 1 ? '1 åpen sak' : aapne.length + ' åpne saker')];
+    if (hoy) deler.push(hoy + ' høy prioritet');
+    if (venter) deler.push(venter + ' venter på deler');
+    el.textContent = '· ' + deler.join(' · ');
+    el.classList.toggle('text-bad', hoy > 0);
 }
 
 function btOppdaterLiveBadge() {
@@ -479,6 +397,7 @@ function btEndreStatus(id, nyStatus) {
         av: btAktivTekniker(),
         tekst: 'Status endret til ' + nyStatus + '.'
     }]);
+    btSaker = btSaker.map(function(s) { return s.id === id ? oppdatert : s; });
     btLagre(BT_SAKER, oppdatert);
 }
 
@@ -544,7 +463,7 @@ function btSettTeknikere(tekst) {
 // SAKSDIALOG
 // ============================================
 
-function btAapneSakModal(id) {
+function btAapneSakModal(id, nyBase) {
     btRedigererSakId = id || null;
     var modal = document.getElementById('issueModal');
     var sak = id ? btSaker.find(function(s) { return s.id === id; }) : null;
@@ -563,9 +482,8 @@ function btAapneSakModal(id) {
         ? (sak.ansvarlig || '')
         : (paaJobb.length === 1 ? paaJobb[0] : '');
 
-    // Ny sak: bruk basen det filtreres på, ellers den som ble brukt sist.
-    var standardBase = document.getElementById('filterBase').value ||
-        localStorage.getItem('bt_sist_base') || BT_BASER[0];
+    // Ny sak: bruk basen den ble opprettet fra, ellers den som ble brukt sist.
+    var standardBase = nyBase || localStorage.getItem('bt_sist_base') || BT_BASER[0];
     document.getElementById('issueBase').value = sak ? (sak.base || BT_BASER[0]) : standardBase;
 
     document.getElementById('issueNyLogg').value = '';
@@ -642,835 +560,251 @@ function btLagreFraModal() {
 }
 
 // ============================================
-// STØRRE REPARASJONER
+// BASESTATUS (én seksjon per base)
 // ============================================
+// Basestatus og tool status lagres som dokumentene base-BGO, base-TOS og
+// base-HFT i bt_status, og står til neste tekniker oppdaterer dem.
 
-function btStandardProsjekt(tittel, maskin) {
-    var naa = btNaa();
-    return {
-        tittel: tittel,
-        maskin: maskin || '',
-        base: '',
-        status: 'Planlagt',
-        ansvarlig: '',
-        planlagtStart: '',
-        forventetFerdig: '',
-        delpunkter: [],
-        merknad: '',
-        slettet: false,
-        opprettet: naa,
-        oppdatert: naa
-    };
+function btBaseDokId(base) {
+    return 'base-' + base;
 }
 
-// LN-OXI MLG repair skal alltid finnes på tavlen. Prosjekter slettes aldri
-// fysisk (bare merkes), så den opprettes bare én gang.
-function btSikreMlgProsjekt() {
-    var standard = btStandardProsjekt('LN-OXI MLG repair', 'LN-OXI');
-    if (btHarSky()) {
-        var ref = window.firestoreDb.collection(BT_PROSJEKTER).doc(BT_MLG_ID);
-        // Spør serveren direkte, så en tom lokal cache aldri overskriver lagret arbeid.
-        ref.get({ source: 'server' })
-            .then(function(doc) { if (!doc.exists) return ref.set(standard); })
-            .catch(function(err) { btSkyFeil(err, 'Kunne ikke sjekke MLG-reparasjonen'); });
-        return;
-    }
-    var liste = btLesLokalt(BT_PROSJEKTER, '[]');
-    if (!liste.some(function(p) { return p.id === BT_MLG_ID; })) {
-        standard.id = BT_MLG_ID;
-        btLagre(BT_PROSJEKTER, standard);
-    }
-}
-
-function btSynligeProsjekter() {
-    var visFerdige = document.getElementById('filterShowDoneProjects').checked;
-    return btProsjekter
-        .filter(function(p) { return !p.slettet && (visFerdige || p.status !== 'Ferdig'); })
-        .sort(function(a, b) { return new Date(a.opprettet || 0) - new Date(b.opprettet || 0); });
-}
-
-function btProsjektKortHtml(p) {
-    var id = escapeHtml(p.id);
-    var delpunkter = p.delpunkter || [];
-    var ferdige = delpunkter.filter(function(d) { return d.ferdig; }).length;
-    var prosent = delpunkter.length ? Math.round(ferdige / delpunkter.length * 100) : 0;
-    var tone = p.status === 'Ferdig' ? 'tone-ok' : (p.status === 'Venter på deler' ? 'tone-warn' : 'tone-info');
-
-    var statusKnapper = BT_PROSJEKT_STATUSER.map(function(s) {
-        return '<button type="button" class="issue-status-btn issue-status-' + btStatusKlasse(s) +
-            (s === p.status ? ' is-active' : '') + ' prosjekt-status-btn" data-id="' + id +
-            '" data-status="' + escapeHtml(s) + '">' + escapeHtml(s) + '</button>';
-    }).join('');
-
-    var dagerTilFerdig = p.forventetFerdig && p.status !== 'Ferdig'
-        ? btDagerMellom(btIDag(), p.forventetFerdig) : null;
-    var fristTekst = dagerTilFerdig === null ? '' : (dagerTilFerdig >= 0
-        ? dagerTilFerdig + ' dager til forventet ferdig'
-        : Math.abs(dagerTilFerdig) + ' dager over forventet ferdig');
-
-    var punktHtml = delpunkter.map(function(d, i) {
-        return '<div class="delpunkt-item' + (d.ferdig ? ' is-done' : '') + '">' +
-            '<label><input type="checkbox" class="delpunkt-check" data-id="' + id + '" data-index="' + i + '"' +
-            (d.ferdig ? ' checked' : '') + '><span>' + escapeHtml(d.tekst) + '</span></label>' +
-            '<button type="button" class="remove-person-btn delpunkt-fjern" data-id="' + id +
-            '" data-index="' + i + '" aria-label="Fjern delpunkt">×</button>' +
+function btByggBaseSeksjoner() {
+    var div = document.getElementById('baseSeksjoner');
+    div.innerHTML = BT_BASER.map(function(base) {
+        return '<div class="form-section base-seksjon" data-base="' + base + '">' +
+            '<div class="section-heading-row">' +
+                '<h2>' + base + ' <span class="base-oppsummering" id="baseOppsummering-' + base + '"></span></h2>' +
+                '<button type="button" class="btn btn-success ny-sak-btn" data-base="' + base + '">Ny sak</button>' +
+            '</div>' +
+            '<div class="base-status-felt">' +
+                '<label for="baseStatus-' + base + '">Basestatus</label>' +
+                '<textarea id="baseStatus-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="status"' +
+                    ' placeholder="Status på basen nå: hangar, utstyr, bemanning, avtaler …"></textarea>' +
+                '<label for="baseTools-' + base + '">Tool status</label>' +
+                '<input type="text" id="baseTools-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="tools"' +
+                    ' placeholder="f.eks. Alle tools innenfor kalibrering, TQ-0051 due 01.11">' +
+            '</div>' +
+            '<div class="bt-card-meta" id="baseMeta-' + base + '"></div>' +
+            '<h3 class="report-group-title">Utestående saker</h3>' +
+            '<div id="issueBoard-' + base + '" class="issue-board"><p class="no-reports">Laster...</p></div>' +
         '</div>';
-    }).join('');
-
-    return '<div class="bt-card ' + tone + '">' +
-        '<div class="bt-card-head">' +
-            '<input type="text" class="bt-title-input prosjekt-felt" data-id="' + id + '" data-felt="tittel"' +
-                ' data-fokus="prosjekt:' + id + ':tittel" value="' + escapeHtml(p.tittel || '') + '" aria-label="Navn på reparasjon">' +
-            '<div class="issue-status-group">' + statusKnapper + '</div>' +
-        '</div>' +
-        '<div class="bt-field-grid">' +
-            '<label>Maskin<select class="bt-input prosjekt-felt" data-id="' + id + '" data-felt="maskin" data-fokus="prosjekt:' + id + ':maskin">' +
-                btMaskinValg(p.maskin, '–') + '</select></label>' +
-            '<label>Base<select class="bt-input prosjekt-felt" data-id="' + id + '" data-felt="base" data-fokus="prosjekt:' + id + ':base">' +
-                btBaseValg(p.base, '–') + '</select></label>' +
-            '<label>Ansvarlig<input type="text" class="bt-input prosjekt-felt" data-id="' + id + '" data-felt="ansvarlig"' +
-                ' data-fokus="prosjekt:' + id + ':ansvarlig" value="' + escapeHtml(p.ansvarlig || '') + '" placeholder="Navn"></label>' +
-            '<label>Planlagt start<input type="date" class="bt-input prosjekt-felt" data-id="' + id + '" data-felt="planlagtStart"' +
-                ' data-fokus="prosjekt:' + id + ':planlagtStart" value="' + escapeHtml(p.planlagtStart || '') + '"></label>' +
-            '<label>Forventet ferdig<input type="date" class="bt-input prosjekt-felt" data-id="' + id + '" data-felt="forventetFerdig"' +
-                ' data-fokus="prosjekt:' + id + ':forventetFerdig" value="' + escapeHtml(p.forventetFerdig || '') + '"></label>' +
-        '</div>' +
-        '<div class="progress-row">' +
-            '<div class="progress-bar"><div class="progress-fill" style="width: ' + prosent + '%"></div></div>' +
-            '<span class="progress-text">' + ferdige + ' av ' + delpunkter.length + ' delpunkter ferdig</span>' +
-        '</div>' +
-        '<div class="delpunkt-list">' + punktHtml + '</div>' +
-        '<div class="delpunkt-add">' +
-            '<input type="text" class="bt-input delpunkt-ny" data-id="' + id + '" data-fokus="prosjekt:' + id + ':nyttpunkt"' +
-                ' placeholder="Nytt delpunkt, f.eks. «Bestille MLG-deler»">' +
-            '<button type="button" class="btn-small btn-view delpunkt-legg-til" data-id="' + id + '">Legg til</button>' +
-        '</div>' +
-        '<label class="bt-textarea-label">Merknad / fremdrift' +
-            '<textarea class="bt-input prosjekt-felt" data-id="' + id + '" data-felt="merknad"' +
-            ' data-fokus="prosjekt:' + id + ':merknad" placeholder="Status, deler, avtaler med CAMO osv.">' +
-            escapeHtml(p.merknad || '') + '</textarea></label>' +
-        '<div class="bt-card-meta">' +
-            (fristTekst ? '<span class="' + (dagerTilFerdig < 0 ? 'text-bad' : '') + '">' + fristTekst + '</span> · ' : '') +
-            (p.oppdatert ? 'Sist oppdatert ' + escapeHtml(btFormatTidspunkt(p.oppdatert)) + ' · ' : '') +
-            '<button type="button" class="link-button prosjekt-fjern" data-id="' + id + '">Fjern reparasjon</button>' +
-        '</div>' +
+    }).join('') +
+    // Saker med en base som ikke finnes lenger, så de ikke forsvinner ut av syne.
+    '<div class="form-section base-seksjon" id="baseSeksjon-annet" style="display: none;">' +
+        '<h2>Saker uten base</h2>' +
+        '<div id="issueBoard-annet" class="issue-board"></div>' +
     '</div>';
 }
 
-function btRenderProsjekter() {
-    var board = document.getElementById('projectBoard');
-    if (!board) return;
-
-    var prosjekter = btSynligeProsjekter();
-    var html = prosjekter.length
-        ? prosjekter.map(btProsjektKortHtml).join('')
-        : '<p class="no-reports">Ingen aktive reparasjoner.</p>';
-
-    btRenderBevarFokus(board, html, function() {
-        board.querySelectorAll('.prosjekt-felt').forEach(function(felt) {
-            felt.addEventListener('change', function() {
-                var endring = {};
-                endring[this.getAttribute('data-felt')] = this.value;
-                btOppdaterProsjekt(this.getAttribute('data-id'), endring);
-            });
+function btFyllBaseFelt() {
+    BT_BASER.forEach(function(base) {
+        var data = btBaseStatus[base] || {};
+        [['baseStatus-', 'status'], ['baseTools-', 'tools']].forEach(function(par) {
+            var felt = document.getElementById(par[0] + base);
+            // Feltet noen skriver i nå, overskrives ikke av oppdateringer fra andre.
+            if (felt && felt !== document.activeElement) felt.value = data[par[1]] || '';
         });
-        board.querySelectorAll('.prosjekt-status-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                btOppdaterProsjekt(this.getAttribute('data-id'), { status: this.getAttribute('data-status') });
-            });
-        });
-        board.querySelectorAll('.delpunkt-check').forEach(function(boks) {
-            boks.addEventListener('change', function() {
-                btEndreDelpunkt(this.getAttribute('data-id'), parseInt(this.getAttribute('data-index'), 10), this.checked);
-            });
-        });
-        board.querySelectorAll('.delpunkt-fjern').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                btFjernDelpunkt(this.getAttribute('data-id'), parseInt(this.getAttribute('data-index'), 10));
-            });
-        });
-        board.querySelectorAll('.delpunkt-ny').forEach(function(felt) {
-            felt.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    btLeggTilDelpunkt(this.getAttribute('data-id'), this);
-                }
-            });
-        });
-        board.querySelectorAll('.delpunkt-legg-til').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var id = this.getAttribute('data-id');
-                var felt = board.querySelector('.delpunkt-ny[data-id="' + CSS.escape(id) + '"]');
-                btLeggTilDelpunkt(id, felt);
-            });
-        });
-        board.querySelectorAll('.prosjekt-fjern').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var p = btProsjekter.find(function(x) { return x.id === btn.getAttribute('data-id'); });
-                if (!p) return;
-                if (!confirm('Fjerne «' + (p.tittel || 'reparasjonen') + '» fra tavlen? Sett heller status «Ferdig» hvis den er fullført.')) return;
-                btOppdaterProsjekt(p.id, { slettet: true });
-            });
-        });
+        var meta = document.getElementById('baseMeta-' + base);
+        if (meta) {
+            meta.textContent = data.oppdatert
+                ? 'Sist oppdatert ' + btFormatTidspunkt(data.oppdatert) + (data.av ? ' av ' + data.av : '')
+                : '';
+        }
     });
 }
 
-function btOppdaterProsjekt(id, endring) {
-    var p = btProsjekter.find(function(x) { return x.id === id; });
-    if (!p) return;
-    var oppdatert = Object.assign({}, p, endring, { oppdatert: btNaa() });
-    btLagre(BT_PROSJEKTER, oppdatert);
-}
-
-function btLeggTilDelpunkt(id, felt) {
-    var tekst = felt ? felt.value.trim() : '';
-    if (!tekst) return;
-    var p = btProsjekter.find(function(x) { return x.id === id; });
-    if (!p) return;
-    felt.value = '';
-    btOppdaterProsjekt(id, { delpunkter: (p.delpunkter || []).concat([{ tekst: tekst, ferdig: false }]) });
-}
-
-function btEndreDelpunkt(id, index, ferdig) {
-    var p = btProsjekter.find(function(x) { return x.id === id; });
-    if (!p || !p.delpunkter || !p.delpunkter[index]) return;
-    var punkter = p.delpunkter.map(function(d, i) {
-        return i === index ? { tekst: d.tekst, ferdig: ferdig } : d;
+function btLagreBaseFelt(felt) {
+    var base = felt.getAttribute('data-base');
+    var data = Object.assign({}, btBaseStatus[base] || {}, {
+        id: btBaseDokId(base),
+        base: base,
+        oppdatert: btNaa(),
+        av: btAktivTekniker()
     });
-    btOppdaterProsjekt(id, { delpunkter: punkter });
-}
-
-function btFjernDelpunkt(id, index) {
-    var p = btProsjekter.find(function(x) { return x.id === id; });
-    if (!p || !p.delpunkter) return;
-    btOppdaterProsjekt(id, { delpunkter: p.delpunkter.filter(function(d, i) { return i !== index; }) });
-}
-
-function btNyttProsjekt() {
-    var tittel = prompt('Navn på reparasjonen:', '');
-    if (!tittel || !tittel.trim()) return;
-    btLagre(BT_PROSJEKTER, btStandardProsjekt(tittel.trim(), ''));
+    data[felt.getAttribute('data-felt')] = felt.value;
+    // Oppdateres med en gang, så tool status rett etter basestatus ikke overskriver den.
+    btBaseStatus[base] = data;
+    btLagre(BT_STATUS, data);
 }
 
 // ============================================
-// TOOLS - NESTE DUE
+// ETTERSYN (flere samtidig)
 // ============================================
+// Hvert ettersyn er et eget dokument i bt_status, merket med art: 'ettersyn'.
+// Det eldre enkeltdokumentet «ettersyn» har ingen merking, men har maskin.
 
-function btToolDager(tool, fraDato) {
-    return btDagerMellom(fraDato || btIDag(), tool.nesteDue);
+const BT_ETTERSYN_RANG = { 'Pågår': 0, 'Venter på deler': 1, 'Planlegging': 2, 'Ferdig': 3 };
+
+function btErEttersyn(dok) {
+    return dok.id.indexOf('base-') !== 0 && (dok.art === 'ettersyn' || !!dok.reg);
 }
 
-function btToolTone(dager) {
-    if (dager === null) return 'tone-neutral';
-    if (dager < 0) return 'tone-bad';
-    if (dager <= BT_TOOLS_VARSEL_DAGER) return 'tone-warn';
-    return 'tone-ok';
-}
-
-function btToolDagerTekst(dager) {
-    if (dager === null) return 'Ingen dato';
-    if (dager < 0) return 'Forfalt ' + Math.abs(dager) + ' d';
-    if (dager === 0) return 'Due i dag';
-    return dager + ' d';
-}
-
-function btSorterTools(tools) {
-    return tools.slice().sort(function(a, b) {
-        return (a.nesteDue || '9999').localeCompare(b.nesteDue || '9999');
+function btSorterEttersyn(liste) {
+    return liste.slice().sort(function(a, b) {
+        var r = (BT_ETTERSYN_RANG[a.status] !== undefined ? BT_ETTERSYN_RANG[a.status] : 2) -
+            (BT_ETTERSYN_RANG[b.status] !== undefined ? BT_ETTERSYN_RANG[b.status] : 2);
+        if (r !== 0) return r;
+        return (a.startet || '9999').localeCompare(b.startet || '9999') ||
+            new Date(a.opprettet || 0) - new Date(b.opprettet || 0);
     });
 }
 
-// Oppsummering per base: antall forfalt, antall snart due og nærmeste due-dato.
-function btToolStatusPerBase(fraDato) {
-    return BT_BASER.map(function(base) {
-        var tools = btTools.filter(function(t) { return t.base === base; });
-        var forfalt = tools.filter(function(t) { var d = btToolDager(t, fraDato); return d !== null && d < 0; });
-        var snart = tools.filter(function(t) {
-            var d = btToolDager(t, fraDato);
-            return d !== null && d >= 0 && d <= BT_TOOLS_VARSEL_DAGER;
-        });
-        var kommende = btSorterTools(tools.filter(function(t) {
-            var d = btToolDager(t, fraDato);
-            return d !== null && d >= 0;
-        }));
-        return {
-            base: base,
-            antall: tools.length,
-            forfalt: forfalt.length,
-            snart: snart.length,
-            neste: kommende.length ? { beskrivelse: kommende[0].beskrivelse, nesteDue: kommende[0].nesteDue } : null
-        };
-    });
+function btEttersynFrist(e) {
+    if (e.status === 'Ferdig') return null;
+    if (e.status === 'Planlegging' && e.startet) {
+        var tilStart = btDagerMellom(btIDag(), e.startet);
+        if (tilStart > 0) return { tekst: 'Starter om ' + tilStart + ' dager', over: false };
+        if (tilStart === 0) return { tekst: 'Starter i dag', over: false };
+        return { tekst: 'Skulle startet for ' + Math.abs(tilStart) + ' dager siden', over: true };
+    }
+    if (e.forventetFerdig) {
+        var tilFerdig = btDagerMellom(btIDag(), e.forventetFerdig);
+        return tilFerdig >= 0
+            ? { tekst: tilFerdig + ' dager til forventet ferdig', over: false }
+            : { tekst: Math.abs(tilFerdig) + ' dager over forventet ferdig', over: true };
+    }
+    return null;
 }
 
-function btRenderTools() {
-    btRenderToolOppsummering();
+function btEttersynKortHtml(e) {
+    var id = escapeHtml(e.id);
+    var status = e.status || 'Planlegging';
+    var tone = status === 'Ferdig' ? 'tone-ok'
+        : (status === 'Venter på deler' ? 'tone-warn'
+            : (status === 'Planlegging' ? 'tone-neutral' : 'tone-info'));
+    var fokus = function(felt) { return ' data-id="' + id + '" data-felt="' + felt + '" data-fokus="ettersyn:' + id + ':' + felt + '"'; };
 
-    var liste = document.getElementById('toolList');
-    if (!liste) return;
-    var base = document.getElementById('toolFilterBase').value;
-    var periode = document.getElementById('toolFilterPeriode').value;
-
-    var iBase = btTools.filter(function(t) { return !base || t.base === base; });
-    var synlige = btSorterTools(iBase.filter(function(t) {
-        if (!periode) return true;
-        var d = btToolDager(t);
-        return d !== null && d <= parseInt(periode, 10);
-    }));
-
-    var teller = btTools.length ? 'Viser ' + synlige.length + ' av ' + iBase.length + ' tools' : '';
-    document.getElementById('toolCount').textContent =
-        [btToolMelding, teller].filter(Boolean).join(' · ');
-
-    if (btTools.length === 0) {
-        liste.innerHTML = '<p class="no-reports">Ingen tools registrert. Dra inn en due-rapport over, eller legg til manuelt.</p>';
-        return;
-    }
-    if (synlige.length === 0) {
-        liste.innerHTML = '<p class="no-reports">Ingen tools forfaller i denne perioden. Velg «Alle tools» for å se hele lista.</p>';
-        return;
-    }
-
-    liste.innerHTML = synlige.map(function(t) {
-        var dager = btToolDager(t);
-        return '<div class="tool-item ' + btToolTone(dager) + '">' +
-            '<span class="tool-days">' + escapeHtml(btToolDagerTekst(dager)) + '</span>' +
-            '<div class="tool-main">' +
-                '<span class="tool-name">' + escapeHtml(t.beskrivelse || '-') + '</span>' +
-                '<span class="tool-meta">' +
-                    '<span class="issue-chip issue-chip-base">' + escapeHtml(t.base || '-') + '</span> ' +
-                    'Due ' + escapeHtml(btKortDato(t.nesteDue)) +
-                    (t.kilde ? ' · fra ' + escapeHtml(t.kilde) : '') +
-                '</span>' +
-            '</div>' +
-            '<button type="button" class="btn-small btn-view tool-edit-btn" data-id="' + escapeHtml(t.id) + '">Endre</button>' +
-        '</div>';
+    var statusKnapper = BT_ETTERSYN_STATUSER.map(function(s) {
+        return '<button type="button" class="issue-status-btn issue-status-' + btStatusKlasse(s) +
+            (s === status ? ' is-active' : '') + ' ettersyn-status-btn" data-id="' + id +
+            '" data-status="' + escapeHtml(s) + '">' + escapeHtml(s) + '</button>';
     }).join('');
 
-    liste.querySelectorAll('.tool-edit-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() { btAapneToolModal(this.getAttribute('data-id')); });
-    });
-}
+    var frist = btEttersynFrist(Object.assign({}, e, { status: status }));
 
-function btRenderToolOppsummering() {
-    var div = document.getElementById('toolBaseSummary');
-    if (!div) return;
-    var valgt = document.getElementById('toolFilterBase').value;
-
-    div.innerHTML = btToolStatusPerBase().map(function(s) {
-        var tone = s.forfalt ? ' tone-bad' : (s.snart ? ' tone-warn' : '');
-        var hoved = s.antall === 0 ? 'Ingen tools registrert'
-            : (s.neste ? 'Neste due ' + btKortDato(s.neste.nesteDue) : 'Ingen kommende due');
-        var under = s.antall === 0 ? '' : [
-            s.forfalt ? s.forfalt + ' forfalt' : null,
-            s.snart ? s.snart + ' innen ' + BT_TOOLS_VARSEL_DAGER + ' d' : null,
-            s.neste ? s.neste.beskrivelse : null
-        ].filter(Boolean).join(' · ');
-
-        return '<button type="button" class="base-tile' + (valgt === s.base ? ' is-active' : '') + tone +
-            '" data-base="' + s.base + '">' +
-            '<span class="base-tile-code">' + s.base + '</span>' +
-            '<span class="base-tile-main">' + escapeHtml(hoved) + '</span>' +
-            '<span class="base-tile-sub">' + escapeHtml(under) + '</span>' +
-        '</button>';
-    }).join('');
-
-    div.querySelectorAll('.base-tile').forEach(function(tile) {
-        tile.addEventListener('click', function() {
-            var filter = document.getElementById('toolFilterBase');
-            var base = this.getAttribute('data-base');
-            filter.value = filter.value === base ? '' : base;
-            btRenderTools();
-        });
-    });
-}
-
-function btAapneToolModal(id) {
-    btRedigererToolId = id || null;
-    var tool = id ? btTools.find(function(t) { return t.id === id; }) : null;
-    document.getElementById('toolModalTitle').textContent = tool ? 'Endre tool' : 'Legg til tool';
-    document.getElementById('toolBeskrivelse').value = tool ? (tool.beskrivelse || '') : '';
-    document.getElementById('toolBase').value = tool ? (tool.base || BT_BASER[0])
-        : (document.getElementById('toolFilterBase').value || BT_BASER[0]);
-    document.getElementById('toolDue').value = tool ? (tool.nesteDue || '') : '';
-    document.getElementById('toolDeleteBtn').style.display = tool ? '' : 'none';
-    document.getElementById('toolModal').style.display = 'flex';
-    document.getElementById('toolBeskrivelse').focus();
-}
-
-function btLukkToolModal() {
-    document.getElementById('toolModal').style.display = 'none';
-    btRedigererToolId = null;
-}
-
-function btLagreTool() {
-    var beskrivelse = document.getElementById('toolBeskrivelse').value.trim();
-    var due = document.getElementById('toolDue').value;
-    if (!beskrivelse) { alert('Skriv inn hvilket tool det gjelder.'); return; }
-    if (!due) { alert('Velg neste due-dato.'); return; }
-
-    var eksisterende = btRedigererToolId
-        ? btTools.find(function(t) { return t.id === btRedigererToolId; }) : null;
-    btLagre(BT_TOOLS, Object.assign({}, eksisterende || { opprettet: btNaa(), kilde: 'Manuelt' }, {
-        id: btRedigererToolId || undefined,
-        beskrivelse: beskrivelse,
-        base: document.getElementById('toolBase').value,
-        nesteDue: due,
-        oppdatert: btNaa()
-    }), btLukkToolModal);
-}
-
-// ============================================
-// IMPORT AV DUE-RAPPORT
-// ============================================
-// Leser teksten ut av fila direkte i nettleseren, uten AI og uten at fila
-// sendes noe sted. Hver linje med en dato blir en kandidat, og den seneste
-// datoen på linja brukes som neste due (rapporter har gjerne både «siste
-// kalibrering» og «neste due»). Brukeren godkjenner alt før det lagres.
-
-var btSkriptLaster = {};
-
-function btLastSkript(url) {
-    if (!btSkriptLaster[url]) {
-        btSkriptLaster[url] = new Promise(function(resolve, reject) {
-            var s = document.createElement('script');
-            s.src = url;
-            s.onload = resolve;
-            s.onerror = function() {
-                delete btSkriptLaster[url];
-                reject(new Error('Kunne ikke laste ' + url));
-            };
-            document.head.appendChild(s);
-        });
-    }
-    return btSkriptLaster[url];
-}
-
-function btLesPdf(fil) {
-    return btLastSkript(BT_PDFJS_URL).then(function() {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = BT_PDFJS_WORKER_URL;
-        return fil.arrayBuffer();
-    }).then(function(buffer) {
-        return window.pdfjsLib.getDocument({ data: buffer }).promise;
-    }).then(function(pdf) {
-        var sider = [];
-        for (var i = 1; i <= pdf.numPages; i++) {
-            sider.push(pdf.getPage(i).then(function(side) { return side.getTextContent(); }));
-        }
-        return Promise.all(sider);
-    }).then(function(innhold) {
-        // PDF-tekst kommer som løse biter; biter på samme høyde settes sammen til en linje.
-        var linjer = [];
-        innhold.forEach(function(tekst) {
-            var rader = [];
-            tekst.items.forEach(function(item) {
-                if (!item.str || !item.str.trim()) return;
-                var x = item.transform[4];
-                var y = item.transform[5];
-                var rad = rader.find(function(r) { return Math.abs(r.y - y) < 3; });
-                if (!rad) {
-                    rad = { y: y, deler: [] };
-                    rader.push(rad);
-                }
-                rad.deler.push({ x: x, tekst: item.str });
-            });
-            rader.sort(function(a, b) { return b.y - a.y; });
-            rader.forEach(function(rad) {
-                linjer.push(rad.deler.sort(function(a, b) { return a.x - b.x; })
-                    .map(function(d) { return d.tekst; }).join('  '));
-            });
-        });
-        return linjer;
-    });
-}
-
-function btLesRegneark(fil) {
-    return btLastSkript(BT_XLSX_URL).then(function() {
-        return fil.arrayBuffer();
-    }).then(function(buffer) {
-        var bok = XLSX.read(buffer, { type: 'array', cellNF: true });
-        var linjer = [];
-        bok.SheetNames.forEach(function(navn) {
-            var ark = bok.Sheets[navn];
-            if (!ark['!ref']) return;
-            var omraade = XLSX.utils.decode_range(ark['!ref']);
-            for (var r = omraade.s.r; r <= omraade.e.r; r++) {
-                var celler = [];
-                for (var c = omraade.s.c; c <= omraade.e.c; c++) {
-                    var celle = ark[XLSX.utils.encode_cell({ r: r, c: c })];
-                    if (!celle) continue;
-                    // Datoceller leses fra serienummeret, så formatet i fila ikke kan feiltolkes.
-                    if (celle.t === 'n' && celle.z && XLSX.SSF.is_date(celle.z)) {
-                        var d = XLSX.SSF.parse_date_code(celle.v);
-                        celler.push(d.y + '-' + String(d.m).padStart(2, '0') + '-' + String(d.d).padStart(2, '0'));
-                    } else {
-                        celler.push(String(celle.w !== undefined ? celle.w : celle.v));
-                    }
-                }
-                if (celler.length) linjer.push(celler.join('  '));
-            }
-        });
-        return linjer;
-    });
-}
-
-function btLesFil(fil) {
-    var navn = (fil.name || '').toLowerCase();
-    if (navn.endsWith('.pdf') || fil.type === 'application/pdf') return btLesPdf(fil);
-    if (/\.(xlsx|xls|xlsm|ods)$/.test(navn)) return btLesRegneark(fil);
-    return fil.text().then(function(tekst) {
-        return tekst.split(/\r?\n/).map(function(l) { return l.replace(/[;\t,]+/g, '  '); });
-    });
-}
-
-const BT_MAANEDER = {
-    jan: 1, feb: 2, mar: 3, apr: 4, mai: 5, may: 5, jun: 6, jul: 7,
-    aug: 8, sep: 9, okt: 10, oct: 10, nov: 11, des: 12, dec: 12
-};
-
-function btAar(tekst) {
-    return tekst.length === 2 ? 2000 + parseInt(tekst, 10) : parseInt(tekst, 10);
-}
-
-function btGyldigIso(aar, mnd, dag) {
-    if (!(aar >= 2000 && aar <= 2100) || !(mnd >= 1 && mnd <= 12) || !(dag >= 1 && dag <= 31)) return null;
-    var d = new Date(Date.UTC(aar, mnd - 1, dag));
-    if (d.getUTCMonth() !== mnd - 1 || d.getUTCDate() !== dag) return null;
-    return aar + '-' + String(mnd).padStart(2, '0') + '-' + String(dag).padStart(2, '0');
-}
-
-// Finner datoer i en tekstlinje. Norsk rekkefølge (dag før måned) antas,
-// men 03/25/2027 tolkes som amerikansk fordi 25 ikke kan være en måned.
-function btFinnDatoer(tekst) {
-    var funn = [];
-    var monstre = [
-        { re: /\b(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})\b/g,
-          del: function(m) { return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)]; } },
-        { re: /\b(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4}|\d{2})\b/g,
-          del: function(m) {
-              var dag = parseInt(m[1], 10);
-              var mnd = parseInt(m[2], 10);
-              if (mnd > 12 && dag <= 12) { var t = dag; dag = mnd; mnd = t; }
-              return [btAar(m[3]), mnd, dag];
-          } },
-        { re: /\b(\d{1,2})[\s.\-\/]*(jan|feb|mar|apr|mai|may|jun|jul|aug|sep|okt|oct|nov|des|dec)[a-zæøå]*\.?[\s.\-\/]*(\d{4}|\d{2})\b/gi,
-          del: function(m) { return [btAar(m[3]), BT_MAANEDER[m[2].toLowerCase()], parseInt(m[1], 10)]; } }
-    ];
-    monstre.forEach(function(monster) {
-        var treff;
-        monster.re.lastIndex = 0;
-        while ((treff = monster.re.exec(tekst)) !== null) {
-            var start = treff.index;
-            var slutt = start + treff[0].length;
-            if (funn.some(function(f) { return start < f.slutt && slutt > f.start; })) continue;
-            var deler = monster.del(treff);
-            var iso = btGyldigIso(deler[0], deler[1], deler[2]);
-            if (iso) funn.push({ start: start, slutt: slutt, iso: iso });
-        }
-    });
-    return funn;
-}
-
-function btFinnBaseITekst(tekst) {
-    if (/\bBGO\b/.test(tekst) || /bergen|flesland/i.test(tekst)) return 'BGO';
-    if (/\bTOS\b/.test(tekst) || /troms[øo]/i.test(tekst)) return 'TOS';
-    if (/\bHFT\b/.test(tekst) || /hammerfest/i.test(tekst)) return 'HFT';
-    return '';
-}
-
-function btToolNokkel(beskrivelse, base) {
-    return (beskrivelse || '').toLowerCase().replace(/\s+/g, ' ').trim() + '|' + (base || '');
-}
-
-function btFinnTool(beskrivelse, base) {
-    var nokkel = btToolNokkel(beskrivelse, base);
-    return btTools.find(function(t) { return btToolNokkel(t.beskrivelse, t.base) === nokkel; }) || null;
-}
-
-function btTolkLinjer(linjer) {
-    var rader = [];
-    linjer.forEach(function(linje) {
-        if (!linje || !linje.trim()) return;
-        var datoer = btFinnDatoer(linje);
-        if (datoer.length === 0) return;
-
-        var due = datoer.reduce(function(maks, d) { return d.iso > maks ? d.iso : maks; }, datoer[0].iso);
-
-        // Beskrivelsen er linja uten datoer og basekoder.
-        var beskrivelse = linje;
-        datoer.slice().sort(function(a, b) { return b.start - a.start; }).forEach(function(d) {
-            beskrivelse = beskrivelse.slice(0, d.start) + ' ' + beskrivelse.slice(d.slutt);
-        });
-        // \b fungerer ikke med æøå i JavaScript, så bokstavgrensene skrives ut.
-        beskrivelse = beskrivelse
-            .replace(/\b(BGO|TOS|HFT)\b/g, ' ')
-            .replace(/(^|[^a-zæøå])(bergen|flesland|tromsø|tromso|hammerfest)(?![a-zæøå])/gi, '$1 ')
-            .replace(/[|;\t]+/g, ' ')
-            .replace(/\s{2,}/g, ' ')
-            .replace(/^[\s,.:\-–]+|[\s,.:\-–]+$/g, '')
-            .trim();
-        if (beskrivelse.length < 3 || !/[a-zæøå]/i.test(beskrivelse)) return;
-
-        // Linjer som ligner topptekst/bunntekst foreslås ikke importert.
-        var mistenkelig = /(generert|generated|printed|utskrevet|utskrift|^\s*(dato|date)\s*:|\bpage\s+\d|\bside\s+\d+\s+(av|of)\b)/i.test(linje);
-
-        rader.push({ beskrivelse: beskrivelse, base: btFinnBaseITekst(linje), due: due, valgt: !mistenkelig });
-    });
-
-    // Samme tool flere ganger i fila: behold seneste due.
-    var unike = {};
-    rader.forEach(function(r) {
-        var nokkel = btToolNokkel(r.beskrivelse, r.base);
-        if (!unike[nokkel] || r.due > unike[nokkel].due) unike[nokkel] = r;
-    });
-    return Object.keys(unike).map(function(k) { return unike[k]; });
-}
-
-function btHaandterFil(fil) {
-    if (!fil) return;
-    var sone = document.getElementById('toolDropZone');
-    var originalTekst = sone.innerHTML;
-    sone.classList.add('is-loading');
-    sone.innerHTML = '<p>Leser ' + escapeHtml(fil.name) + '...</p>';
-
-    btLesFil(fil).then(function(linjer) {
-        var rader = btTolkLinjer(linjer);
-        if (rader.length === 0) {
-            alert('Fant ingen datoer i «' + fil.name + '».\n\nEr PDF-en skannet (et bilde av papir)? ' +
-                'Da finnes det ingen tekst å lese, og den må leses med OCR eller AI i stedet.');
-            return;
-        }
-        btImportFilnavn = fil.name;
-        btImportRader = rader;
-        btAapneImportModal();
-    }).catch(function(err) {
-        console.error('Import feilet:', err);
-        alert('Kunne ikke lese fila. Sjekk at det er en PDF, Excel- eller CSV-fil, og at du er på nett.');
-    }).then(function() {
-        sone.classList.remove('is-loading');
-        sone.innerHTML = originalTekst;
-    });
-}
-
-function btAapneImportModal() {
-    var utenBase = btImportRader.filter(function(r) { return !r.base; }).length;
-    document.getElementById('importInfo').textContent =
-        'Fant ' + btImportRader.length + ' linjer med dato i «' + btImportFilnavn + '». ' +
-        'Den seneste datoen på hver linje er brukt som neste due. Sjekk og rett før du importerer.' +
-        (utenBase ? ' ' + utenBase + ' linjer mangler base – velg standard base under, eller per linje.' : '');
-    document.getElementById('importStandardBase').value = document.getElementById('toolFilterBase').value || '';
-    btRenderImportRader();
-    document.getElementById('importModal').style.display = 'flex';
-}
-
-function btLukkImportModal() {
-    document.getElementById('importModal').style.display = 'none';
-    btImportRader = [];
-}
-
-function btRenderImportRader() {
-    var div = document.getElementById('importRows');
-    var standardBase = document.getElementById('importStandardBase').value;
-
-    var html = '<div class="import-row import-row-head"><span></span><span>Tool</span><span>Base</span><span>Neste due</span><span>Endring</span></div>' +
-        btImportRader.map(function(r, i) {
-            var base = r.base || standardBase;
-            var eksisterende = base ? btFinnTool(r.beskrivelse, base) : null;
-            var endring = !base ? 'Mangler base'
-                : (!eksisterende ? 'Ny'
-                    : (eksisterende.nesteDue === r.due ? 'Uendret' : 'Fra ' + btKortDato(eksisterende.nesteDue)));
-            var endringKlasse = !base ? 'text-bad' : (eksisterende && eksisterende.nesteDue === r.due ? 'text-muted' : '');
-
-            return '<div class="import-row' + (r.valgt ? '' : ' is-unselected') + '">' +
-                '<input type="checkbox" class="import-valgt" data-index="' + i + '"' + (r.valgt ? ' checked' : '') + ' aria-label="Importer linje">' +
-                '<input type="text" class="bt-input import-beskrivelse" data-index="' + i + '" data-fokus="import:' + i + ':beskrivelse" value="' + escapeHtml(r.beskrivelse) + '">' +
-                '<select class="bt-input import-base" data-index="' + i + '" data-fokus="import:' + i + ':base">' +
-                    btBaseValg(r.base, standardBase ? 'Standard (' + standardBase + ')' : 'Velg...') + '</select>' +
-                '<input type="date" class="bt-input import-due" data-index="' + i + '" data-fokus="import:' + i + ':due" value="' + escapeHtml(r.due) + '">' +
-                '<span class="import-endring ' + endringKlasse + '">' + escapeHtml(endring) + '</span>' +
-            '</div>';
-        }).join('');
-
-    // Tegnes på nytt etter fokusbyttet, så et klikk i neste felt ikke går tapt.
-    function senere() { setTimeout(btRenderImportRader, 0); }
-
-    btRenderBevarFokus(div, html, function() {
-        div.querySelectorAll('.import-valgt').forEach(function(boks) {
-            boks.addEventListener('change', function() {
-                btImportRader[parseInt(this.getAttribute('data-index'), 10)].valgt = this.checked;
-                senere();
-            });
-        });
-        div.querySelectorAll('.import-beskrivelse').forEach(function(felt) {
-            felt.addEventListener('input', function() {
-                btImportRader[parseInt(this.getAttribute('data-index'), 10)].beskrivelse = this.value;
-            });
-            felt.addEventListener('change', senere);
-        });
-        div.querySelectorAll('.import-base').forEach(function(felt) {
-            felt.addEventListener('change', function() {
-                btImportRader[parseInt(this.getAttribute('data-index'), 10)].base = this.value;
-                senere();
-            });
-        });
-        div.querySelectorAll('.import-due').forEach(function(felt) {
-            felt.addEventListener('change', function() {
-                btImportRader[parseInt(this.getAttribute('data-index'), 10)].due = this.value;
-                senere();
-            });
-        });
-    });
-
-    var valgte = btImportRader.filter(function(r) { return r.valgt; }).length;
-    document.getElementById('importSaveBtn').textContent = 'Importer valgte (' + valgte + ')';
-    document.getElementById('importVelgAlle').checked = valgte === btImportRader.length;
-}
-
-function btImporterValgte() {
-    var standardBase = document.getElementById('importStandardBase').value;
-    var valgte = btImportRader.filter(function(r) { return r.valgt; });
-    if (valgte.length === 0) { alert('Ingen linjer er valgt.'); return; }
-
-    var utenBase = valgte.filter(function(r) { return !(r.base || standardBase); }).length;
-    if (utenBase) {
-        alert(utenBase + ' valgte linjer mangler base. Velg «Base for rader uten base», eller base per linje.');
-        return;
-    }
-    var utenDato = valgte.filter(function(r) { return !r.due || !r.beskrivelse.trim(); }).length;
-    if (utenDato) {
-        alert(utenDato + ' valgte linjer mangler tool-navn eller dato.');
-        return;
-    }
-
-    var naa = btNaa();
-    var dokumenter = valgte.map(function(r) {
-        var base = r.base || standardBase;
-        var eksisterende = btFinnTool(r.beskrivelse, base);
-        return Object.assign({}, eksisterende || { opprettet: naa }, {
-            id: eksisterende ? eksisterende.id : undefined,
-            beskrivelse: r.beskrivelse.trim(),
-            base: base,
-            nesteDue: r.due,
-            kilde: btImportFilnavn,
-            oppdatert: naa
-        });
-    });
-
-    var antall = dokumenter.length;
-    btLagreMange(BT_TOOLS, dokumenter, function() {
-        btLukkImportModal();
-        btToolMelding = 'Importerte ' + antall + ' tools fra ' + btImportFilnavn;
-        btRenderTools();
-        setTimeout(function() {
-            btToolMelding = '';
-            btRenderTools();
-        }, 10000);
-    });
-}
-
-// ============================================
-// ETTERSYN
-// ============================================
-
-function btLagreEttersyn(endring) {
-    btLagre(BT_STATUS, Object.assign({}, btEttersyn, endring, { id: BT_ETTERSYN_ID, oppdatert: btNaa() }));
+    return '<div class="bt-card ' + tone + (status === 'Ferdig' ? ' is-closed' : '') + '">' +
+        '<div class="bt-card-head">' +
+            '<span class="bt-card-title">' + escapeHtml(e.reg || 'Velg maskin') +
+                (e.type ? ' – ' + escapeHtml(e.type) : '') + '</span>' +
+            '<div class="issue-status-group">' + statusKnapper + '</div>' +
+        '</div>' +
+        '<div class="bt-field-grid">' +
+            '<label>Maskin<select class="bt-input ettersyn-felt"' + fokus('reg') + '>' +
+                btMaskinValg(e.reg, 'Velg...') + '</select></label>' +
+            '<label>Type ettersyn<input type="text" class="bt-input ettersyn-felt"' + fokus('type') +
+                ' value="' + escapeHtml(e.type || '') + '" placeholder="f.eks. 400 hrs / MLG repair"></label>' +
+            '<label>Base<select class="bt-input ettersyn-felt"' + fokus('base') + '>' +
+                btBaseValg(e.base, '–') + '</select></label>' +
+            '<label>Start<input type="date" class="bt-input ettersyn-felt"' + fokus('startet') +
+                ' value="' + escapeHtml(e.startet || '') + '"></label>' +
+            '<label>Forventet ferdig<input type="date" class="bt-input ettersyn-felt"' + fokus('forventetFerdig') +
+                ' value="' + escapeHtml(e.forventetFerdig || '') + '"></label>' +
+        '</div>' +
+        '<label class="bt-textarea-label">Fremdrift / merknad' +
+            '<textarea class="bt-input ettersyn-felt"' + fokus('merknad') +
+            ' placeholder="Hva er gjort, hva gjenstår, deler, funn underveis">' + escapeHtml(e.merknad || '') + '</textarea></label>' +
+        '<div class="bt-card-meta">' +
+            (frist ? '<span class="' + (frist.over ? 'text-bad' : '') + '">' + escapeHtml(frist.tekst) + '</span> · ' : '') +
+            (e.oppdatert ? 'Sist oppdatert ' + escapeHtml(btFormatTidspunkt(e.oppdatert)) + ' · ' : '') +
+            '<button type="button" class="link-button ettersyn-fjern" data-id="' + id + '">Fjern ettersyn</button>' +
+        '</div>' +
+    '</div>';
 }
 
 function btRenderEttersyn() {
     var panel = document.getElementById('ettersynPanel');
     if (!panel) return;
-    var e = btEttersyn || {};
-    var reg = e.reg || '';
+    var liste = btSorterEttersyn(btEttersynListe);
+    btRenderBevarFokus(panel, liste.length
+        ? liste.map(btEttersynKortHtml).join('')
+        : '<p class="no-reports">Ingen ettersyn registrert. Trykk «Legg til ettersyn».</p>');
+}
 
-    var html = '<div class="form-group ettersyn-maskin">' +
-        '<label for="ettersynMaskin">Maskin på ettersyn:</label>' +
-        '<select id="ettersynMaskin" class="bt-input" data-fokus="ettersyn:reg">' +
-            btMaskinValg(reg, 'Ingen maskin på ettersyn') + '</select>' +
-    '</div>';
+function btOppdaterEttersyn(id, endring) {
+    var e = btEttersynListe.find(function(x) { return x.id === id; });
+    if (!e) return;
+    var oppdatert = Object.assign({}, e, endring, { art: 'ettersyn', oppdatert: btNaa() });
+    // Oppdater lista med en gang. Ellers bygger en ny endring rett etter (f.eks.
+    // når man tabber videre til neste felt) på en kopi uten denne, og overskriver den.
+    btEttersynListe = btEttersynListe.map(function(x) { return x.id === id ? oppdatert : x; });
+    btLagre(BT_STATUS, oppdatert);
+}
 
-    if (reg) {
-        var status = e.status || 'Pågår';
-        var tone = status === 'Ferdig' ? 'tone-ok' : (status === 'Venter på deler' ? 'tone-warn' : 'tone-info');
-        var statusKnapper = BT_ETTERSYN_STATUSER.map(function(s) {
-            return '<button type="button" class="issue-status-btn issue-status-' + btStatusKlasse(s) +
-                (s === status ? ' is-active' : '') + ' ettersyn-status-btn" data-status="' + escapeHtml(s) + '">' +
-                escapeHtml(s) + '</button>';
-        }).join('');
-
-        var dager = e.forventetFerdig && status !== 'Ferdig' ? btDagerMellom(btIDag(), e.forventetFerdig) : null;
-        var frist = dager === null ? '' : (dager >= 0
-            ? dager + ' dager til forventet ferdig'
-            : Math.abs(dager) + ' dager over forventet ferdig');
-
-        html += '<div class="bt-card ' + tone + '">' +
-            '<div class="bt-card-head">' +
-                '<span class="bt-card-title">' + escapeHtml(reg) + (e.type ? ' – ' + escapeHtml(e.type) : '') + '</span>' +
-                '<div class="issue-status-group">' + statusKnapper + '</div>' +
-            '</div>' +
-            '<div class="bt-field-grid">' +
-                '<label>Type ettersyn<input type="text" class="bt-input ettersyn-felt" data-felt="type" data-fokus="ettersyn:type"' +
-                    ' value="' + escapeHtml(e.type || '') + '" placeholder="f.eks. 600t / 1 år"></label>' +
-                '<label>Base<select class="bt-input ettersyn-felt" data-felt="base" data-fokus="ettersyn:base">' +
-                    btBaseValg(e.base, '–') + '</select></label>' +
-                '<label>Startet<input type="date" class="bt-input ettersyn-felt" data-felt="startet" data-fokus="ettersyn:startet"' +
-                    ' value="' + escapeHtml(e.startet || '') + '"></label>' +
-                '<label>Forventet ferdig<input type="date" class="bt-input ettersyn-felt" data-felt="forventetFerdig" data-fokus="ettersyn:forventetFerdig"' +
-                    ' value="' + escapeHtml(e.forventetFerdig || '') + '"></label>' +
-            '</div>' +
-            '<label class="bt-textarea-label">Fremdrift / merknad' +
-                '<textarea class="bt-input ettersyn-felt" data-felt="merknad" data-fokus="ettersyn:merknad"' +
-                ' placeholder="Hva er gjort, hva gjenstår, funn underveis">' + escapeHtml(e.merknad || '') + '</textarea></label>' +
-            '<div class="bt-card-meta">' +
-                (frist ? '<span class="' + (dager < 0 ? 'text-bad' : '') + '">' + frist + '</span>' : '') +
-                (frist && e.oppdatert ? ' · ' : '') +
-                (e.oppdatert ? 'Sist oppdatert ' + escapeHtml(btFormatTidspunkt(e.oppdatert)) : '') +
-            '</div>' +
-        '</div>';
-    }
-
-    btRenderBevarFokus(panel, html, function() {
-        document.getElementById('ettersynMaskin').addEventListener('change', function() {
-            btByttEttersynMaskin(this);
-        });
-        panel.querySelectorAll('.ettersyn-felt').forEach(function(felt) {
-            felt.addEventListener('change', function() {
-                var endring = {};
-                endring[this.getAttribute('data-felt')] = this.value;
-                btLagreEttersyn(endring);
-            });
-        });
-        panel.querySelectorAll('.ettersyn-status-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                btLagreEttersyn({ status: this.getAttribute('data-status') });
-            });
-        });
+function btNyttEttersyn() {
+    var naa = btNaa();
+    btLagre(BT_STATUS, {
+        art: 'ettersyn',
+        reg: '',
+        type: '',
+        base: '',
+        startet: '',
+        forventetFerdig: '',
+        status: 'Planlegging',
+        merknad: '',
+        opprettet: naa,
+        oppdatert: naa
     });
 }
 
-// Ny maskin betyr nytt ettersyn; feltene fra forrige maskin tas ikke med.
-function btByttEttersynMaskin(select) {
-    var gammel = btEttersyn.reg || '';
-    var ny = select.value;
-    if (ny === gammel) return;
+// ============================================
+// FLYTTING AV STØRRE REPARASJONER
+// ============================================
+// Større reparasjoner er slått sammen med ettersyn. Reparasjoner som ligger
+// igjen, flyttes over én gang og merkes som flyttet. Fast dokument-id gjør at
+// to teknikere som åpner siden samtidig, ikke lager hver sin kopi.
 
-    if (gammel && btEttersyn.status !== 'Ferdig') {
-        var sporsmal = ny
-            ? 'Avslutte ettersynet på ' + gammel + ' og starte på ' + ny + '?'
-            : 'Fjerne ' + gammel + ' fra ettersyn?';
-        if (!confirm(sporsmal)) {
-            select.value = gammel;
-            return;
-        }
-    }
-    btLagreEttersyn({
-        reg: ny,
-        type: '',
-        base: '',
-        startet: ny ? btIDag() : '',
-        forventetFerdig: '',
-        status: ny ? 'Pågår' : '',
-        merknad: ''
+function btReparasjonTilEttersyn(p) {
+    var reg = p.maskin || '';
+    var punkter = (p.delpunkter || []).map(function(d) {
+        return (d.ferdig ? '[x] ' : '[ ] ') + d.tekst;
     });
+    return {
+        id: 'reparasjon-' + p.id,
+        art: 'ettersyn',
+        reg: reg,
+        type: (p.tittel || '').replace(reg, '').trim() || p.tittel || '',
+        base: p.base || '',
+        startet: p.planlagtStart || '',
+        forventetFerdig: p.forventetFerdig || '',
+        status: p.status === 'Planlagt' ? 'Planlegging' : (p.status || 'Planlegging'),
+        merknad: [p.merknad || ''].concat(punkter).filter(Boolean).join('\n'),
+        opprettet: p.opprettet || btNaa(),
+        oppdatert: btNaa()
+    };
+}
+
+function btFlyttReparasjoner() {
+    var skalFlyttes = function(p) { return !p.slettet && !p.flyttet; };
+
+    if (btHarSky()) {
+        var db = window.firestoreDb;
+        // Spør serveren direkte, så en tom lokal cache ikke gir feil svar.
+        db.collection(BT_PROSJEKTER).get({ source: 'server' }).then(function(snapshot) {
+            snapshot.docs.forEach(function(d) {
+                var p = d.data();
+                p.id = d.id;
+                if (!skalFlyttes(p)) return;
+                var ettersyn = btReparasjonTilEttersyn(p);
+                var nyId = ettersyn.id;
+                delete ettersyn.id;
+                db.collection(BT_STATUS).doc(nyId).set(ettersyn)
+                    .then(function() {
+                        return db.collection(BT_PROSJEKTER).doc(p.id).update({ slettet: true, flyttet: true });
+                    })
+                    .catch(function(err) { btSkyFeil(err, 'Kunne ikke flytte reparasjon til ettersyn'); });
+            });
+        }).catch(function(err) { console.warn('Kunne ikke sjekke gamle reparasjoner:', err); });
+        return;
+    }
+
+    var prosjekter = btLesLokalt(BT_PROSJEKTER, '[]');
+    var flyttet = prosjekter.filter(skalFlyttes);
+    if (flyttet.length === 0) return;
+    flyttet.forEach(function(p) { btLagre(BT_STATUS, btReparasjonTilEttersyn(p)); });
+    btSkrivLokalt(BT_PROSJEKTER, prosjekter.map(function(p) {
+        return skalFlyttes(p) ? Object.assign({}, p, { slettet: true, flyttet: true }) : p;
+    }));
 }
 
 // ============================================
@@ -1488,20 +822,14 @@ function btSamleRapportData() {
         });
     });
 
-    var kritiskeTools = btSorterTools(btTools.filter(function(t) {
-        var d = btToolDager(t, dato);
-        return d !== null && d <= BT_TOOLS_VARSEL_DAGER;
-    })).map(function(t) {
-        return { beskrivelse: t.beskrivelse || '', base: t.base || '', nesteDue: t.nesteDue || '',
-            dagerIgjen: btToolDager(t, dato) };
-    });
-
-    var e = btEttersyn || {};
-
     return {
         dato: dato,
         tekniker: document.getElementById('btTekniker').value.trim(),
         baser: BT_BASER.slice(),
+        baseOversikt: BT_BASER.map(function(base) {
+            var b = btBaseStatus[base] || {};
+            return { base: base, status: b.status || '', tools: b.tools || '' };
+        }),
         kontroll: {
             verktoy: document.getElementById('btVerktoy').checked,
             kalibrering: document.getElementById('btKalibrering').checked,
@@ -1512,26 +840,12 @@ function btSamleRapportData() {
         overlevering: document.getElementById('btOverlevering').value.trim(),
         aapneSaker: aapne.map(btSakSnapshot),
         endringer: endretIDag.map(btSakSnapshot),
-        prosjekter: btProsjekter.filter(function(p) { return !p.slettet && p.status !== 'Ferdig'; })
-            .sort(function(a, b) { return new Date(a.opprettet || 0) - new Date(b.opprettet || 0); })
-            .map(function(p) {
-                return {
-                    tittel: p.tittel || '', maskin: p.maskin || '', base: p.base || '',
-                    status: p.status || '', ansvarlig: p.ansvarlig || '',
-                    planlagtStart: p.planlagtStart || '', forventetFerdig: p.forventetFerdig || '',
-                    delpunkter: (p.delpunkter || []).map(function(d) { return { tekst: d.tekst, ferdig: !!d.ferdig }; }),
-                    merknad: p.merknad || ''
-                };
-            }),
-        tools: {
-            totalt: btTools.length,
-            perBase: btToolStatusPerBase(dato),
-            kritiske: kritiskeTools
-        },
-        ettersyn: {
-            reg: e.reg || '', type: e.type || '', base: e.base || '', startet: e.startet || '',
-            forventetFerdig: e.forventetFerdig || '', status: e.status || '', merknad: e.merknad || ''
-        },
+        ettersynListe: btSorterEttersyn(btEttersynListe).map(function(e) {
+            return {
+                reg: e.reg || '', type: e.type || '', base: e.base || '', startet: e.startet || '',
+                forventetFerdig: e.forventetFerdig || '', status: e.status || 'Planlegging', merknad: e.merknad || ''
+            };
+        }),
         timestamp: btNaa()
     };
 }
@@ -1692,6 +1006,7 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
 
     function statusFarge(status) {
         if (status === 'Serviceable' || status === 'Lukket' || status === 'Ferdig') return green;
+        if (status === 'Planlegging' || status === 'Planlagt') return blueDark;
         if (status === 'AOG' || status === 'Åpen') return red;
         return amber;
     }
@@ -1735,17 +1050,46 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
     doc.text(teknikerLinjer, left + 20, y);
     y += teknikerLinjer.length * 4.2 + 2;
 
-    // --- Utestående saker, gruppert per base ---
+    // Etikett i fet skrift til venstre, tekst med linjebryting til høyre.
+    function etikettTekst(etikett, verdi) {
+        sikrePlass(6);
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        farge(textPrimary);
+        doc.text(etikett + ':', left, y);
+        doc.setFont('helvetica', 'normal');
+        farge(textSecondary);
+        doc.splitTextToSize(verdi, width - 26).forEach(function(linje, i) {
+            if (i > 0) sikrePlass(5);
+            doc.text(linje, left + 26, y);
+            y += 4;
+        });
+        y += 1;
+    }
+
+    // --- Base for base (eldre rapporter: utestående saker gruppert per base) ---
     var aapne = (data.aapneSaker || []).map(function(s) {
         return Object.assign({}, s, { base: btNormaliserBase(s.base) || btNormaliserBase(data.base) || '' });
     });
-    seksjonstittel('Utestående saker (' + aapne.length + ')');
+    var oversikt = {};
+    (data.baseOversikt || []).forEach(function(b) { oversikt[b.base] = b; });
+    if (!data.baseOversikt) seksjonstittel('Utestående saker (' + aapne.length + ')');
     var grupper = (data.baser || []).slice();
     aapne.forEach(function(s) { if (grupper.indexOf(s.base) === -1) grupper.push(s.base); });
     if (grupper.length === 0) grupper = [''];
     grupper.forEach(function(base) {
         var iGruppe = aapne.filter(function(s) { return s.base === base; });
-        undertittel((base || 'Uten base') + ' (' + iGruppe.length + ')');
+        if (data.baseOversikt) {
+            seksjonstittel((base || 'Uten base') + ' – ' +
+                (iGruppe.length === 1 ? '1 åpen sak' : iGruppe.length + ' åpne saker'));
+            if (oversikt[base]) {
+                etikettTekst('Basestatus', oversikt[base].status || '-');
+                etikettTekst('Tool status', oversikt[base].tools || '-');
+                y += 1.5;
+            }
+        } else {
+            undertittel((base || 'Uten base') + ' (' + iGruppe.length + ')');
+        }
         if (iGruppe.length === 0) {
             tom('Ingen åpne saker.');
             return;
@@ -1856,7 +1200,7 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
     }
 
     // --- Basestatus ---
-    seksjonstittel('Basestatus');
+    seksjonstittel(data.baseOversikt ? 'Vaktslutt' : 'Basestatus');
     var punkter = [
         ['Verktøy på plass', data.kontroll.verktoy],
         ['Kalibrering av tools à jour', data.kontroll.kalibrering],
@@ -1891,7 +1235,7 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
     y += 8;
 
     if (data.generelt) {
-        undertittel('Generell status / hendelser');
+        undertittel(data.baseOversikt ? 'Generelle hendelser' : 'Generell status / hendelser');
         tekst(data.generelt, { innrykk: 2, farge: textSecondary });
         y += 2;
     }
@@ -1901,7 +1245,20 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
     tekst(data.overlevering || '(Ingen merknader)', { innrykk: 2 });
 
     // --- Ettersyn (til sist) ---
-    if (data.ettersyn) {
+    if (data.ettersynListe) {
+        seksjonstittel('Ettersyn (' + data.ettersynListe.length + ')');
+        if (data.ettersynListe.length === 0) tom('Ingen ettersyn registrert.');
+        data.ettersynListe.forEach(function(e) {
+            tittelMedStatus((e.reg || 'Ukjent maskin') + (e.type ? ' – ' + e.type : ''), e.status);
+            tekst([
+                e.base || null,
+                e.startet ? 'Start ' + btKortDato(e.startet) : null,
+                e.forventetFerdig ? 'Forventet ferdig ' + btKortDato(e.forventetFerdig) : null
+            ].filter(Boolean).join('  ·  ') || '-', { storrelse: 8, farge: textSecondary, innrykk: 2, linjeHoyde: 4 });
+            if (e.merknad) tekst(e.merknad, { storrelse: 8.5, innrykk: 2, linjeHoyde: 4 });
+            y += 2.5;
+        });
+    } else if (data.ettersyn) {
         seksjonstittel('Ettersyn');
         var e = data.ettersyn;
         if (!e.reg) {
@@ -1992,6 +1349,13 @@ function btLagreRapport(rapport) {
     btRenderRapportRegister();
 }
 
+function btAntallAktiveEttersyn(rapport) {
+    if (rapport.ettersynListe) {
+        return rapport.ettersynListe.filter(function(e) { return e.status !== 'Ferdig'; }).length;
+    }
+    return rapport.ettersyn && rapport.ettersyn.reg ? 1 : 0;
+}
+
 function btRenderRapportRegister() {
     var div = document.getElementById('btReportRegister');
     if (!div) return;
@@ -2010,7 +1374,7 @@ function btRenderRapportRegister() {
             'Tekniker: ' + escapeHtml(rapport.tekniker || '-'),
             antall + ' utestående',
             forfalt ? forfalt + ' tools forfalt' : null,
-            rapport.ettersyn && rapport.ettersyn.reg ? escapeHtml(rapport.ettersyn.reg) + ' på ettersyn' : null
+            btAntallAktiveEttersyn(rapport) ? btAntallAktiveEttersyn(rapport) + ' ettersyn' : null
         ].filter(Boolean);
         return '<div class="report-item">' +
             '<div class="report-item-info">' +
@@ -2082,6 +1446,7 @@ function btSendEpost() {
 
 document.addEventListener('DOMContentLoaded', function() {
     setDateInputToToday('btDate');
+    btByggBaseSeksjoner();
 
     btSettTeknikere(localStorage.getItem('bt_tekniker') || '');
     document.getElementById('btTeknikerDropdown').addEventListener('change', function() {
@@ -2092,11 +1457,27 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('btTeknikerExtra').addEventListener('input', btOppdaterTeknikerFelt);
 
-    // Saker
-    ['filterShowClosed', 'filterBase', 'filterKategori'].forEach(function(id) {
+    // Baser: saker, basestatus og tool status. Kortene tegnes på nytt ved
+    // hver endring, så klikk fanges opp på seksjonene i stedet for per knapp.
+    ['filterShowClosed', 'filterKategori'].forEach(function(id) {
         document.getElementById(id).addEventListener('change', btRenderIssueBoard);
     });
-    document.getElementById('newIssueBtn').addEventListener('click', function() { btAapneSakModal(null); });
+    var baseSeksjoner = document.getElementById('baseSeksjoner');
+    baseSeksjoner.addEventListener('click', function(e) {
+        var knapp = e.target.closest('button');
+        if (!knapp) return;
+        if (knapp.classList.contains('issue-status-btn')) {
+            btEndreStatus(knapp.getAttribute('data-id'), knapp.getAttribute('data-status'));
+        } else if (knapp.classList.contains('issue-open-btn')) {
+            btAapneSakModal(knapp.getAttribute('data-id'));
+        } else if (knapp.classList.contains('ny-sak-btn')) {
+            btAapneSakModal(null, knapp.getAttribute('data-base'));
+        }
+    });
+    baseSeksjoner.addEventListener('change', function(e) {
+        if (e.target.classList.contains('base-felt')) btLagreBaseFelt(e.target);
+    });
+
     document.getElementById('issueModalClose').addEventListener('click', btLukkSakModal);
     document.getElementById('issueModal').addEventListener('click', function(e) {
         if (e.target === this) btLukkSakModal();
@@ -2108,67 +1489,34 @@ document.addEventListener('DOMContentLoaded', function() {
         btSlett(BT_SAKER, btRedigererSakId, btLukkSakModal);
     });
 
-    // Større reparasjoner
-    document.getElementById('newProjectBtn').addEventListener('click', btNyttProsjekt);
-    document.getElementById('filterShowDoneProjects').addEventListener('change', btRenderProsjekter);
-
-    // Tools
-    ['toolFilterBase', 'toolFilterPeriode'].forEach(function(id) {
-        document.getElementById(id).addEventListener('change', btRenderTools);
+    // Ettersyn
+    document.getElementById('newEttersynBtn').addEventListener('click', btNyttEttersyn);
+    var ettersynPanel = document.getElementById('ettersynPanel');
+    ettersynPanel.addEventListener('change', function(e) {
+        if (!e.target.classList.contains('ettersyn-felt')) return;
+        var endring = {};
+        endring[e.target.getAttribute('data-felt')] = e.target.value;
+        btOppdaterEttersyn(e.target.getAttribute('data-id'), endring);
     });
-    document.getElementById('newToolBtn').addEventListener('click', function() { btAapneToolModal(null); });
-    document.getElementById('toolModalClose').addEventListener('click', btLukkToolModal);
-    document.getElementById('toolModal').addEventListener('click', function(e) {
-        if (e.target === this) btLukkToolModal();
-    });
-    document.getElementById('toolSaveBtn').addEventListener('click', btLagreTool);
-    document.getElementById('toolDeleteBtn').addEventListener('click', function() {
-        if (!btRedigererToolId) return;
-        if (!confirm('Slette dette toolet fra oversikten?')) return;
-        btSlett(BT_TOOLS, btRedigererToolId, btLukkToolModal);
-    });
-
-    // Filimport: dra og slipp eller klikk for å velge
-    var sone = document.getElementById('toolDropZone');
-    var filInput = document.getElementById('toolFileInput');
-    // Uten dette åpner nettleseren fila i stedet når den slippes ved siden av sonen.
-    document.addEventListener('dragover', function(e) { e.preventDefault(); });
-    document.addEventListener('drop', function(e) { e.preventDefault(); });
-    sone.addEventListener('click', function() { filInput.click(); });
-    sone.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); filInput.click(); }
-    });
-    sone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        sone.classList.add('is-dragover');
-    });
-    sone.addEventListener('dragleave', function() { sone.classList.remove('is-dragover'); });
-    sone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        sone.classList.remove('is-dragover');
-        if (e.dataTransfer.files.length) btHaandterFil(e.dataTransfer.files[0]);
-    });
-    filInput.addEventListener('change', function() {
-        if (this.files.length) btHaandterFil(this.files[0]);
-        this.value = '';
-    });
-
-    document.getElementById('importModalClose').addEventListener('click', btLukkImportModal);
-    document.getElementById('importSaveBtn').addEventListener('click', btImporterValgte);
-    document.getElementById('importStandardBase').addEventListener('change', btRenderImportRader);
-    document.getElementById('importVelgAlle').addEventListener('change', function() {
-        var valgt = this.checked;
-        btImportRader.forEach(function(r) { r.valgt = valgt; });
-        btRenderImportRader();
+    ettersynPanel.addEventListener('click', function(e) {
+        var knapp = e.target.closest('button');
+        if (!knapp) return;
+        var id = knapp.getAttribute('data-id');
+        if (knapp.classList.contains('ettersyn-status-btn')) {
+            btOppdaterEttersyn(id, { status: knapp.getAttribute('data-status') });
+        } else if (knapp.classList.contains('ettersyn-fjern')) {
+            var e2 = btEttersynListe.find(function(x) { return x.id === id; });
+            var navn = e2 && e2.reg ? e2.reg + (e2.type ? ' – ' + e2.type : '') : 'dette ettersynet';
+            if (!confirm('Fjerne ' + navn + ' fra lista? Sett heller status «Ferdig» hvis det er fullført.')) return;
+            btSlett(BT_STATUS, id);
+        }
     });
 
     // Rapport
     document.getElementById('btExportPdf').addEventListener('click', btGenererPdf);
     document.getElementById('btSendEmail').addEventListener('click', btSendEpost);
     document.getElementById('btReset').addEventListener('click', function() {
-        if (!confirm('Nullstille vaktfeltene? Saker, reparasjoner, tools og ettersyn beholdes.')) return;
+        if (!confirm('Nullstille vaktfeltene? Basestatus, saker og ettersyn beholdes.')) return;
         ['btVerktoy', 'btKalibrering', 'btHangar', 'btForbruk'].forEach(function(id) {
             document.getElementById(id).checked = false;
         });
@@ -2185,19 +1533,16 @@ document.addEventListener('DOMContentLoaded', function() {
     btLytt(BT_SAKER, function(liste) {
         btSaker = liste.map(btNormaliserSak);
         btRenderIssueBoard();
-    }, 'issueBoard');
-    btLytt(BT_PROSJEKTER, function(liste) {
-        btProsjekter = liste;
-        btRenderProsjekter();
-    }, 'projectBoard');
-    btSikreMlgProsjekt();
-    btLytt(BT_TOOLS, function(liste) {
-        btTools = liste.map(function(t) { t.base = btNormaliserBase(t.base); return t; });
-        btRenderTools();
-    }, 'toolList');
+    }, 'issueBoard-' + BT_BASER[0]);
     btLytt(BT_STATUS, function(liste) {
-        btEttersyn = liste.find(function(d) { return d.id === BT_ETTERSYN_ID; }) || {};
+        btBaseStatus = {};
+        liste.forEach(function(d) {
+            if (d.id.indexOf('base-') === 0) btBaseStatus[d.base || d.id.slice(5)] = d;
+        });
+        btEttersynListe = liste.filter(btErEttersyn);
+        btFyllBaseFelt();
         btRenderEttersyn();
     }, 'ettersynPanel');
+    btFlyttReparasjoner();
     btLastRapporter();
 });
