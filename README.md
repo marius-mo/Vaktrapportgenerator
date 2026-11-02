@@ -29,6 +29,10 @@ Uten Firebase-config faller siden tilbake på `localStorage` i egen nettleser.
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102b`
+i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
+nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
+
 ## Firestore-regler
 
 Basetekniker-siden lagrer i egne samlinger, og Firestore-reglene må gi tilgang
