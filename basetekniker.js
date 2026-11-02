@@ -7,9 +7,9 @@
 
 const BT_BASER = ['BGO', 'TOS', 'HFT'];
 const BT_HELIKOPTRE = ['LN-OXH', 'LN-OXI', 'LN-OXJ', 'LN-OXK'];
-const BT_SAK_STATUSER = ['Åpen', 'Pågår', 'Venter på deler', 'Lukket'];
-const BT_AAPNE_STATUSER = ['Åpen', 'Pågår', 'Venter på deler'];
-const BT_ETTERSYN_STATUSER = ['Planlegging', 'Pågår', 'Venter på deler', 'Ferdig'];
+const BT_SAK_STATUSER = ['Åpen', 'Pågår', 'Lukket'];
+const BT_AAPNE_STATUSER = ['Åpen', 'Pågår'];
+const BT_ETTERSYN_STATUSER = ['Planlegging', 'Pågår', 'Ferdig'];
 
 // Firestore-samlinger. Uten Firebase brukes samme navn som nøkler i localStorage.
 // bt_status holder både basestatus (base-BGO osv.) og ettersyn.
@@ -205,7 +205,6 @@ function btStatusKlasse(status) {
     switch (status) {
         case 'Åpen': return 'open';
         case 'Pågår': return 'progress';
-        case 'Venter på deler': return 'waiting';
         case 'Lukket':
         case 'Ferdig': return 'closed';
         case 'Planlagt':
@@ -267,8 +266,15 @@ function btRenderBevarFokus(container, html, etterRender) {
 // SAKSTAVLE
 // ============================================
 
+// Status «Venter på deler» er fjernet; slike saker og ettersyn regnes som pågående.
+function btUtenVenterPaaDeler(dok) {
+    if (dok.status === 'Venter på deler') dok.status = 'Pågår';
+    return dok;
+}
+
 // Eldre saker brukte GSE og fulle basenavn.
 function btNormaliserSak(sak) {
+    btUtenVenterPaaDeler(sak);
     if (sak.kategori === 'GSE/verktøy') sak.kategori = 'Tools/kalibrering';
     if (sak.omraade === 'GSE/verktøy') sak.omraade = 'Tools';
     sak.base = btNormaliserBase(sak.base);
@@ -293,7 +299,7 @@ function btSynligeSaker(iBase) {
 
 function btSorterSaker(saker) {
     var prioRang = { 'Høy': 0, 'Normal': 1, 'Lav': 2 };
-    var statusRang = { 'Åpen': 0, 'Pågår': 1, 'Venter på deler': 2, 'Lukket': 3 };
+    var statusRang = { 'Åpen': 0, 'Pågår': 1, 'Lukket': 2 };
     return saker.slice().sort(function(a, b) {
         var s = (statusRang[a.status] || 0) - (statusRang[b.status] || 0);
         if (s !== 0) return s;
@@ -370,10 +376,8 @@ function btRenderBaseOppsummering(base) {
     if (!el) return;
     var aapne = btSaker.filter(function(s) { return s.base === base && btErAapen(s); });
     var hoy = aapne.filter(function(s) { return s.prioritet === 'Høy'; }).length;
-    var venter = aapne.filter(function(s) { return s.status === 'Venter på deler'; }).length;
     var deler = [aapne.length === 0 ? 'ingen åpne saker' : (aapne.length === 1 ? '1 åpen sak' : aapne.length + ' åpne saker')];
     if (hoy) deler.push(hoy + ' høy prioritet');
-    if (venter) deler.push(venter + ' venter på deler');
     el.textContent = '· ' + deler.join(' · ');
     el.classList.toggle('text-bad', hoy > 0);
 }
@@ -634,7 +638,7 @@ function btLagreBaseFelt(felt) {
 // Hvert ettersyn er et eget dokument i bt_status, merket med art: 'ettersyn'.
 // Det eldre enkeltdokumentet «ettersyn» har ingen merking, men har maskin.
 
-const BT_ETTERSYN_RANG = { 'Pågår': 0, 'Venter på deler': 1, 'Planlegging': 2, 'Ferdig': 3 };
+const BT_ETTERSYN_RANG = { 'Pågår': 0, 'Planlegging': 1, 'Ferdig': 2 };
 
 function btErEttersyn(dok) {
     return dok.id.indexOf('base-') !== 0 && (dok.art === 'ettersyn' || !!dok.reg);
@@ -642,8 +646,8 @@ function btErEttersyn(dok) {
 
 function btSorterEttersyn(liste) {
     return liste.slice().sort(function(a, b) {
-        var r = (BT_ETTERSYN_RANG[a.status] !== undefined ? BT_ETTERSYN_RANG[a.status] : 2) -
-            (BT_ETTERSYN_RANG[b.status] !== undefined ? BT_ETTERSYN_RANG[b.status] : 2);
+        var r = (BT_ETTERSYN_RANG[a.status] !== undefined ? BT_ETTERSYN_RANG[a.status] : 1) -
+            (BT_ETTERSYN_RANG[b.status] !== undefined ? BT_ETTERSYN_RANG[b.status] : 1);
         if (r !== 0) return r;
         return (a.startet || '9999').localeCompare(b.startet || '9999') ||
             new Date(a.opprettet || 0) - new Date(b.opprettet || 0);
@@ -670,9 +674,7 @@ function btEttersynFrist(e) {
 function btEttersynKortHtml(e) {
     var id = escapeHtml(e.id);
     var status = e.status || 'Planlegging';
-    var tone = status === 'Ferdig' ? 'tone-ok'
-        : (status === 'Venter på deler' ? 'tone-warn'
-            : (status === 'Planlegging' ? 'tone-neutral' : 'tone-info'));
+    var tone = status === 'Ferdig' ? 'tone-ok' : (status === 'Planlegging' ? 'tone-neutral' : 'tone-info');
     var fokus = function(felt) { return ' data-id="' + id + '" data-felt="' + felt + '" data-fokus="ettersyn:' + id + ':' + felt + '"'; };
 
     var statusKnapper = BT_ETTERSYN_STATUSER.map(function(s) {
@@ -830,14 +832,6 @@ function btSamleRapportData() {
             var b = btBaseStatus[base] || {};
             return { base: base, status: b.status || '', tools: b.tools || '' };
         }),
-        kontroll: {
-            verktoy: document.getElementById('btVerktoy').checked,
-            kalibrering: document.getElementById('btKalibrering').checked,
-            hangar: document.getElementById('btHangar').checked,
-            forbruk: document.getElementById('btForbruk').checked
-        },
-        generelt: document.getElementById('btGenerelt').value.trim(),
-        overlevering: document.getElementById('btOverlevering').value.trim(),
         aapneSaker: aapne.map(btSakSnapshot),
         endringer: endretIDag.map(btSakSnapshot),
         ettersynListe: btSorterEttersyn(btEttersynListe).map(function(e) {
@@ -1199,50 +1193,52 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
         }
     }
 
-    // --- Basestatus ---
-    seksjonstittel(data.baseOversikt ? 'Vaktslutt' : 'Basestatus');
-    var punkter = [
-        ['Verktøy på plass', data.kontroll.verktoy],
-        ['Kalibrering av tools à jour', data.kontroll.kalibrering],
-        ['Hangar ryddig', data.kontroll.hangar],
-        ['Forbruksmateriell OK', data.kontroll.forbruk]
-    ];
-    doc.setFontSize(9);
-    punkter.forEach(function(punkt, i) {
-        var kolonne = i % 2;
-        if (kolonne === 0 && i > 0) y += 5.5;
-        sikrePlass(6);
-        var x = left + kolonne * (width / 2);
-        var boks = 4;
-        if (punkt[1]) {
-            doc.setFillColor(green[0], green[1], green[2]);
-            doc.setDrawColor(green[0], green[1], green[2]);
-            doc.rect(x, y - 3, boks, boks, 'FD');
-            doc.setDrawColor(255, 255, 255);
-            doc.setLineWidth(1.2);
-            doc.line(x + 0.9, y - 1.1, x + 1.9, y - 0.1);
-            doc.line(x + 1.9, y - 0.1, x + 3.3, y - 2.3);
-            doc.setLineWidth(0.4);
-        } else {
-            doc.setFillColor(255, 255, 255);
-            doc.setDrawColor(border[0], border[1], border[2]);
-            doc.rect(x, y - 3, boks, boks, 'FD');
+    // --- Kontrollpunkter og overlevering (bare eldre rapporter har disse) ---
+    if (data.kontroll) {
+        seksjonstittel(data.baseOversikt ? 'Vaktslutt' : 'Basestatus');
+        var punkter = [
+            ['Verktøy på plass', data.kontroll.verktoy],
+            ['Kalibrering av tools à jour', data.kontroll.kalibrering],
+            ['Hangar ryddig', data.kontroll.hangar],
+            ['Forbruksmateriell OK', data.kontroll.forbruk]
+        ];
+        doc.setFontSize(9);
+        punkter.forEach(function(punkt, i) {
+            var kolonne = i % 2;
+            if (kolonne === 0 && i > 0) y += 5.5;
+            sikrePlass(6);
+            var x = left + kolonne * (width / 2);
+            var boks = 4;
+            if (punkt[1]) {
+                doc.setFillColor(green[0], green[1], green[2]);
+                doc.setDrawColor(green[0], green[1], green[2]);
+                doc.rect(x, y - 3, boks, boks, 'FD');
+                doc.setDrawColor(255, 255, 255);
+                doc.setLineWidth(1.2);
+                doc.line(x + 0.9, y - 1.1, x + 1.9, y - 0.1);
+                doc.line(x + 1.9, y - 0.1, x + 3.3, y - 2.3);
+                doc.setLineWidth(0.4);
+            } else {
+                doc.setFillColor(255, 255, 255);
+                doc.setDrawColor(border[0], border[1], border[2]);
+                doc.rect(x, y - 3, boks, boks, 'FD');
+            }
+            doc.setFont('helvetica', 'normal');
+            farge(punkt[1] ? textPrimary : textSecondary);
+            doc.text(punkt[0], x + 6, y);
+        });
+        y += 8;
+
+        if (data.generelt) {
+            undertittel(data.baseOversikt ? 'Generelle hendelser' : 'Generell status / hendelser');
+            tekst(data.generelt, { innrykk: 2, farge: textSecondary });
+            y += 2;
         }
-        doc.setFont('helvetica', 'normal');
-        farge(punkt[1] ? textPrimary : textSecondary);
-        doc.text(punkt[0], x + 6, y);
-    });
-    y += 8;
 
-    if (data.generelt) {
-        undertittel(data.baseOversikt ? 'Generelle hendelser' : 'Generell status / hendelser');
-        tekst(data.generelt, { innrykk: 2, farge: textSecondary });
-        y += 2;
+        // --- Overlevering ---
+        seksjonstittel('Overlevering til neste vakt');
+        tekst(data.overlevering || '(Ingen merknader)', { innrykk: 2 });
     }
-
-    // --- Overlevering ---
-    seksjonstittel('Overlevering til neste vakt');
-    tekst(data.overlevering || '(Ingen merknader)', { innrykk: 2 });
 
     // --- Ettersyn (til sist) ---
     if (data.ettersynListe) {
@@ -1515,19 +1511,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Rapport
     document.getElementById('btExportPdf').addEventListener('click', btGenererPdf);
     document.getElementById('btSendEmail').addEventListener('click', btSendEpost);
-    document.getElementById('btReset').addEventListener('click', function() {
-        if (!confirm('Nullstille vaktfeltene? Basestatus, saker og ettersyn beholdes.')) return;
-        ['btVerktoy', 'btKalibrering', 'btHangar', 'btForbruk'].forEach(function(id) {
-            document.getElementById(id).checked = false;
-        });
-        document.getElementById('btGenerelt').value = '';
-        document.getElementById('btOverlevering').value = '';
-        setDateInputToToday('btDate');
-        var epost = document.getElementById('btSendEmail');
-        epost.disabled = true;
-        epost.classList.add('btn-neutral');
-        epost.classList.remove('btn-success');
-    });
 
     // Sanntidsdata
     btLytt(BT_SAKER, function(liste) {
@@ -1539,7 +1522,7 @@ document.addEventListener('DOMContentLoaded', function() {
         liste.forEach(function(d) {
             if (d.id.indexOf('base-') === 0) btBaseStatus[d.base || d.id.slice(5)] = d;
         });
-        btEttersynListe = liste.filter(btErEttersyn);
+        btEttersynListe = liste.filter(btErEttersyn).map(btUtenVenterPaaDeler);
         btFyllBaseFelt();
         btRenderEttersyn();
     }, 'ettersynPanel');

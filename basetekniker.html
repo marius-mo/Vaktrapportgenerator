@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261102b">
+    <link rel="stylesheet" href="styles.css?v=20261102c">
 </head>
 <body>
     <script>
@@ -87,43 +87,6 @@
         <div id="baseSeksjoner"></div>
 
         <div class="form-section">
-            <h2>Vaktslutt</h2>
-            <div class="checkbox-group">
-                <label class="checkbox-label kontrollpunkt-item">
-                    <input type="checkbox" id="btVerktoy">
-                    <span class="checkbox-custom"></span>
-                    <span class="checkbox-text">Verktøy på plass</span>
-                </label>
-                <label class="checkbox-label kontrollpunkt-item">
-                    <input type="checkbox" id="btKalibrering">
-                    <span class="checkbox-custom"></span>
-                    <span class="checkbox-text">Kalibrering av tools à jour</span>
-                </label>
-                <label class="checkbox-label kontrollpunkt-item">
-                    <input type="checkbox" id="btHangar">
-                    <span class="checkbox-custom"></span>
-                    <span class="checkbox-text">Hangar ryddig</span>
-                </label>
-                <label class="checkbox-label kontrollpunkt-item">
-                    <input type="checkbox" id="btForbruk">
-                    <span class="checkbox-custom"></span>
-                    <span class="checkbox-text">Forbruksmateriell OK</span>
-                </label>
-            </div>
-
-            <div class="form-row-2">
-                <div class="form-group">
-                    <label for="btGenerelt">Generelle hendelser denne vakten:</label>
-                    <textarea id="btGenerelt" placeholder="Hva er gjort, hva skjedde?"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="btOverlevering">Overlevering til neste vakt:</label>
-                    <textarea id="btOverlevering" placeholder="Arbeid som ikke er ferdig, og hva som må følges opp først."></textarea>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-section">
             <div class="section-heading-row">
                 <h2>Ettersyn</h2>
                 <button type="button" id="newEttersynBtn" class="btn btn-success">Legg til ettersyn</button>
@@ -136,7 +99,6 @@
         <div class="form-actions">
             <button type="button" id="btExportPdf" class="btn btn-success">Generer vaktrapport (PDF)</button>
             <button type="button" id="btSendEmail" class="btn btn-neutral" disabled>Send e-post</button>
-            <button type="button" id="btReset" class="btn btn-danger">Nullstill vaktfelt</button>
         </div>
         <p class="form-actions-note">
             Rapporten tar et øyeblikksbilde av hver base og alle ettersyn ved vaktslutt. Saker og ettersyn blir stående til noen lukker dem.
@@ -202,7 +164,6 @@
                         <select id="issueStatus">
                             <option value="Åpen">Åpen</option>
                             <option value="Pågår">Pågår</option>
-                            <option value="Venter på deler">Venter på deler</option>
                             <option value="Lukket">Lukket</option>
                         </select>
                     </div>
@@ -249,7 +210,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="common.js?v=20261102b"></script>
-    <script src="basetekniker.js?v=20261102b"></script>
+    <script src="common.js?v=20261102c"></script>
+    <script src="basetekniker.js?v=20261102c"></script>
 </body>
 </html>
