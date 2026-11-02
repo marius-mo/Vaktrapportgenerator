@@ -17,6 +17,11 @@ videre mellom vakter:
   basen. Saker har kategori, prioritet, ansvarlig og logg, og står til noen
   setter dem til «Lukket». Hele loggen vises på saksruten og i PDF-en, og et
   klikk på ruten åpner saken. Statusendringer logges ikke.
+- **Bilder og filer på saker.** «Legg til bilde» (åpner kamera på mobil) og
+  «Legg til fil» i saksvinduet. Maks 5 MB per fil og 10 per sak. Bilder gjøres
+  mindre (maks 1600 px) før opplasting. Filene lagres i Firestore-samlingen
+  `bt_vedlegg`, delt i biter under 1 MB, siden Firebase Storage krever betalt
+  abonnement. Bare bilder og PDF vises i nettleseren; andre filer lastes ned.
 - **Nice to know**, en knapp øverst til høyre som åpner et popup-vindu med felles
   oppslagsinfo som kundenumre og telefonnumre. Redigeres med «Rediger»-knappen og
   tas ikke med i PDF-en. Telefonnumre og e-post blir klikkbare.
@@ -40,7 +45,7 @@ ikke fra databasen, de vises bare ikke. Utkast eldre enn 14 dager slettes automa
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102l`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102m`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 
@@ -67,7 +72,7 @@ til dem. Ellers får teknikerne feilmelding når de lagrer, og tavla er tom.
        // Basetekniker
        match /{samling}/{dokument} {
          allow read, write: if samling in
-           ['bt_saker', 'bt_prosjekter', 'bt_tools', 'bt_status', 'bt_rapporter'];
+           ['bt_saker', 'bt_prosjekter', 'bt_tools', 'bt_status', 'bt_rapporter', 'bt_vedlegg'];
        }
      }
    }

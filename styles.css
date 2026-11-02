@@ -2627,3 +2627,262 @@ textarea.bt-input {
     margin-bottom: var(--space-5);
   }
 }
+
+/* ============================================
+   VEDLEGG PÅ SAK (bilder og filer)
+   ============================================ */
+.vedlegg-tittel {
+  display: block;
+  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.vedlegg-liste {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+}
+
+.vedlegg-element {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  min-width: 0;
+}
+
+.vedlegg-element.er-ventende {
+  border-style: dashed;
+  border-color: var(--color-primary-500);
+}
+
+.vedlegg-lenke {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2);
+  padding-right: 40px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.vedlegg-lenke:hover .vedlegg-navn {
+  text-decoration: underline;
+}
+
+.vedlegg-forhand {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vedlegg-forhand img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vedlegg-ikon {
+  font-size: 0.7rem;
+  font-weight: var(--font-bold);
+  color: var(--text-secondary);
+}
+
+.vedlegg-tekst {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vedlegg-navn {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vedlegg-info {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.vedlegg-fjern {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vedlegg-fjern:hover {
+  background: var(--color-error-500);
+  color: #FFFFFF;
+}
+
+.vedlegg-tom {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-tertiary);
+  margin: 0 0 var(--space-2);
+}
+
+.vedlegg-knapper {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.vedlegg-knapper .btn {
+  width: auto;
+  flex: 0 1 auto;
+}
+
+.vedlegg-velg.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vedlegg-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: var(--space-2) 0 0;
+}
+
+.issue-chip-vedlegg {
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+}
+
+/* ============================================
+   BASETEKNIKER PÅ MOBIL
+   Større trykkflater, «Ny sak» i overskriftslinjen og et saksvindu som
+   fyller skjermen med feltene to og to.
+   ============================================ */
+@media (max-width: 768px) {
+  .base-seksjon > .section-heading-row {
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+  }
+
+  .base-seksjon > .section-heading-row h2 {
+    min-width: 0;
+    font-size: var(--text-lg);
+  }
+
+  .base-seksjon .ny-sak-btn {
+    width: auto;
+    flex: none;
+    padding: var(--space-2) var(--space-3);
+    min-height: 40px;
+  }
+
+  .issue-status-btn {
+    min-height: 36px;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .issue-card-actions {
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .issue-status-group {
+    gap: var(--space-1);
+  }
+
+  .issue-open-btn,
+  .btn-small {
+    min-height: 40px;
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  .back-link {
+    display: inline-block;
+    padding: var(--space-2) 0;
+  }
+
+  .remove-person-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .issue-filter-chip {
+    min-height: 40px;
+  }
+
+  .issue-filter-chip input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ettersyn-fjern {
+    display: inline-block;
+    padding: var(--space-2) 0;
+  }
+
+  /* Saksvinduet fyller skjermen; feltene står to og to så det blir mindre scrolling */
+  .modal-backdrop {
+    padding: var(--space-2);
+    align-items: stretch;
+  }
+
+  .modal-box {
+    max-height: none;
+    height: 100%;
+    padding: var(--space-3);
+  }
+
+  #issueModal .form-row-3 {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+  }
+
+  #issueModal .form-group {
+    margin-bottom: var(--space-2);
+  }
+
+  #issueModal .modal-footer {
+    flex-direction: row;
+    gap: var(--space-2);
+  }
+
+  #issueModal .modal-footer .btn {
+    flex: 1;
+  }
+
+  .vedlegg-liste {
+    grid-template-columns: 1fr;
+  }
+
+  .vedlegg-knapper .btn {
+    flex: 1 1 0;
+  }
+}
