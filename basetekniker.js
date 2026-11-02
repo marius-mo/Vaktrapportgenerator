@@ -28,6 +28,8 @@ const BT_GAMLE_BASENAVN = { 'Bergen': 'BGO', 'Tromsø': 'TOS', 'Hammerfest': 'HF
 var btSaker = [];
 var btBaseStatus = {};
 var btEttersynListe = [];
+var btNiceToKnow = {};
+var btRedigererNiceToKnow = false;
 var btRapporter = [];
 var btRedigererSakId = null;
 var btLokaleLyttere = {};
@@ -810,6 +812,70 @@ function btFlyttReparasjoner() {
 }
 
 // ============================================
+// NICE TO KNOW
+// ============================================
+// Felles oppslagsinfo som kundenumre og telefonnumre. Lagres som dokumentet
+// «nice-to-know» i bt_status. Det er ment for skjermen og tas ikke med i PDF-en.
+
+const BT_NICE_TO_KNOW_ID = 'nice-to-know';
+
+// Gjør telefonnumre, e-post og nettadresser klikkbare. Bare numre skrevet som
+// telefonnumre (med mellomrom eller +47) lenkes, så kundenumre ikke blir lenker.
+function btLenkifiser(tekst) {
+    return escapeHtml(tekst)
+        .replace(/\bhttps?:\/\/[^\s<]+/g, function(url) {
+            return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>';
+        })
+        .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, function(epost) {
+            return '<a href="mailto:' + epost + '">' + epost + '</a>';
+        })
+        .replace(/(\+47\s?)?\b(\d{2}\s\d{2}\s\d{2}\s\d{2}|\d{3}\s\d{2}\s\d{3})\b|\+47\s?\d{8}\b/g, function(nummer) {
+            return '<a href="tel:' + nummer.replace(/\s/g, '') + '">' + nummer + '</a>';
+        });
+}
+
+function btRenderNiceToKnow() {
+    var visning = document.getElementById('ntkVisning');
+    if (!visning) return;
+    var tekst = (btNiceToKnow.tekst || '').trim();
+    visning.innerHTML = tekst
+        ? btLenkifiser(tekst)
+        : '<span class="no-persons">Ingen info lagt inn ennå. Trykk «Rediger» for å legge til kundenumre, telefonnumre o.l.</span>';
+    document.getElementById('ntkMeta').textContent = btNiceToKnow.oppdatert
+        ? 'Sist oppdatert ' + btFormatTidspunkt(btNiceToKnow.oppdatert) + (btNiceToKnow.av ? ' av ' + btNiceToKnow.av : '')
+        : '';
+}
+
+function btSettNiceToKnowRedigering(paa) {
+    btRedigererNiceToKnow = paa;
+    var felt = document.getElementById('ntkTekst');
+    document.getElementById('ntkVisning').style.display = paa ? 'none' : '';
+    felt.style.display = paa ? '' : 'none';
+    document.getElementById('ntkRediger').style.display = paa ? 'none' : '';
+    document.getElementById('ntkLagre').style.display = paa ? '' : 'none';
+    document.getElementById('ntkAvbryt').style.display = paa ? '' : 'none';
+    if (paa) {
+        document.getElementById('niceToKnow').open = true;
+        felt.value = btNiceToKnow.tekst || '';
+        felt.focus();
+    } else {
+        btRenderNiceToKnow();
+    }
+}
+
+function btLagreNiceToKnow() {
+    var data = {
+        id: BT_NICE_TO_KNOW_ID,
+        tekst: document.getElementById('ntkTekst').value,
+        oppdatert: btNaa(),
+        av: btAktivTekniker()
+    };
+    btNiceToKnow = data;
+    btLagre(BT_STATUS, data);
+    btSettNiceToKnowRedigering(false);
+}
+
+// ============================================
 // VAKTRAPPORT (PDF)
 // ============================================
 
@@ -1485,6 +1551,21 @@ document.addEventListener('DOMContentLoaded', function() {
         btSlett(BT_SAKER, btRedigererSakId, btLukkSakModal);
     });
 
+    // Nice to know: husk om boksen var åpen sist
+    var niceToKnow = document.getElementById('niceToKnow');
+    try { niceToKnow.open = localStorage.getItem('bt_ntk_aapen') === '1'; } catch (e) { /* ikke tilgjengelig */ }
+    niceToKnow.addEventListener('toggle', function() {
+        try { localStorage.setItem('bt_ntk_aapen', niceToKnow.open ? '1' : '0'); } catch (e) { /* ikke tilgjengelig */ }
+    });
+    document.getElementById('ntkRediger').addEventListener('click', function() { btSettNiceToKnowRedigering(true); });
+    document.getElementById('ntkLagre').addEventListener('click', btLagreNiceToKnow);
+    document.getElementById('ntkAvbryt').addEventListener('click', function() {
+        var endret = document.getElementById('ntkTekst').value !== (btNiceToKnow.tekst || '');
+        if (endret && !confirm('Forkaste endringene?')) return;
+        btSettNiceToKnowRedigering(false);
+    });
+    btRenderNiceToKnow();
+
     // Ettersyn
     document.getElementById('newEttersynBtn').addEventListener('click', btNyttEttersyn);
     var ettersynPanel = document.getElementById('ettersynPanel');
@@ -1523,6 +1604,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (d.id.indexOf('base-') === 0) btBaseStatus[d.base || d.id.slice(5)] = d;
         });
         btEttersynListe = liste.filter(btErEttersyn).map(btUtenVenterPaaDeler);
+        btNiceToKnow = liste.find(function(d) { return d.id === BT_NICE_TO_KNOW_ID; }) || {};
+        // Mens noen redigerer, beholdes det de skriver; visningen oppdateres etterpå.
+        if (!btRedigererNiceToKnow) btRenderNiceToKnow();
         btFyllBaseFelt();
         btRenderEttersyn();
     }, 'ettersynPanel');
