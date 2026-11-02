@@ -2565,3 +2565,65 @@ textarea.bt-input {
     margin: var(--space-3) var(--space-3) 0;
   }
 }
+
+/* ============================================
+   BASESEKSJONER – tydelig skille mellom BGO, TOS og HFT
+   Hver base får en mørk overskriftslinje i full bredde og mer luft rundt seg.
+   Ligger sist så den vinner over kompakt oppsett.
+   ============================================ */
+.base-seksjon {
+  --base-pad: var(--space-4);
+  --base-band-bg: #0A2540;
+  --base-band-tekst: #FFFFFF;
+  --base-band-dempet: rgba(255, 255, 255, 0.78);
+  padding: 0 var(--base-pad) var(--base-pad);
+  margin-bottom: var(--space-6);
+  overflow: hidden;
+  border: 1px solid var(--color-gray-300);
+}
+
+[data-theme="dark"] .base-seksjon {
+  --base-band-bg: var(--color-primary-50);
+  --base-band-tekst: var(--color-primary-300);
+  --base-band-dempet: var(--text-secondary);
+}
+
+.base-seksjon > .section-heading-row,
+.base-seksjon > h2 {
+  margin: 0 calc(-1 * var(--base-pad)) var(--space-3);
+  padding: var(--space-2) var(--base-pad);
+  background: var(--base-band-bg);
+}
+
+.base-seksjon > .section-heading-row h2,
+.base-seksjon > h2 {
+  color: var(--base-band-tekst);
+  font-size: var(--text-xl);
+  letter-spacing: 0.04em;
+  margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.base-seksjon > h2 {
+  margin-bottom: var(--space-3);
+}
+
+.base-seksjon .base-oppsummering {
+  color: var(--base-band-dempet);
+  letter-spacing: normal;
+}
+
+.base-seksjon .base-oppsummering.text-bad {
+  color: #FFFFFF;
+  background: var(--color-error-500);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+@media (max-width: 768px) {
+  .base-seksjon {
+    --base-pad: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+}
