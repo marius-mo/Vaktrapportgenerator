@@ -13,20 +13,19 @@ teknikersiden, og bruk «Tilbake til operativ vakt» øverst der for å gå tilb
 Basetekniker-siden dekker alle tre baser (BGO, TOS, HFT), og tilstanden lever
 videre mellom vakter:
 
-- **Utestående saker** for alle baser, gruppert per base, med kategori,
-  prioritet, ansvarlig og loggtråd. Saker står til noen setter dem til «Lukket».
-- **Større reparasjoner** med delpunkter og fremdrift. «LN-OXI MLG repair»
-  opprettes automatisk.
-- **Tools – neste due** per base. Dra inn en due-rapport (PDF, Excel eller CSV),
-  så leses datoene ut og vises for godkjenning før de lagres. Fila leses i
-  nettleseren og sendes ikke noe sted. Skannede PDF-er (bilder) kan ikke leses.
-- **Ettersyn** for maskinen som står inne på ettersyn, nederst på siden.
+- **Én seksjon per base** med basestatus, tool status og utestående saker for
+  basen. Saker har kategori, prioritet, ansvarlig og loggtråd, og står til noen
+  setter dem til «Lukket».
+- **Ettersyn** som egen seksjon nederst. Det kan ligge flere ettersyn samtidig,
+  med status Planlegging, Pågår, Venter på deler eller Ferdig. Det som tidligere
+  het «Større reparasjoner», er flyttet hit automatisk med status Planlegging.
+- **Vaktslutt** med kontrollpunkter, generelle hendelser og overlevering.
 - **Vaktrapport ved vaktslutt** tar et øyeblikksbilde av alt over, pluss hva som
-  ble endret denne vakten og overlevering til neste vakt.
+  ble endret denne vakten.
 
-Tavlen oppdateres i sanntid mellom teknikere via Firestore (samlingene
-`bt_saker`, `bt_prosjekter`, `bt_tools`, `bt_status` og `bt_rapporter`). Uten
-Firebase-config faller siden tilbake på `localStorage` i egen nettleser.
+Tavlen oppdateres i sanntid mellom teknikere via Firestore. Saker ligger i
+`bt_saker`, basestatus og ettersyn i `bt_status`, og rapporter i `bt_rapporter`.
+Uten Firebase-config faller siden tilbake på `localStorage` i egen nettleser.
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
