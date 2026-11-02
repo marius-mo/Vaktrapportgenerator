@@ -512,6 +512,18 @@ function btAapneSakModal(id, nyBase) {
         historikk.innerHTML = '';
     }
 
+    // Utgangspunktet huskes, så vi vet om noe er endret. Finnes et utkast for
+    // samme sak (eller ny sak), legges det inn over.
+    btSakStartverdier = btLesSakSkjema();
+    var utkast = btHentSakUtkast();
+    var gjenopprettet = !!utkast && (utkast.sakId || null) === btRedigererSakId;
+    if (gjenopprettet) {
+        BT_SAK_FELT.forEach(function(feltId) {
+            if (utkast.felt[feltId] !== undefined) document.getElementById(feltId).value = utkast.felt[feltId];
+        });
+    }
+    document.getElementById('issueUtkastInfo').style.display = gjenopprettet ? '' : 'none';
+
     modal.style.display = 'flex';
     document.getElementById('issueTittel').focus();
 }
@@ -519,6 +531,76 @@ function btAapneSakModal(id, nyBase) {
 function btLukkSakModal() {
     document.getElementById('issueModal').style.display = 'none';
     btRedigererSakId = null;
+    btSakStartverdier = null;
+}
+
+// Lukking brukeren ber om. Et klikk utenfor vinduet (f.eks. når man klikker seg
+// tilbake fra et annet program) lukker aldri et vindu med uendret innhold.
+function btForsokLukkSakModal(fraBakgrunn) {
+    if (btSakSkjemaEndret()) {
+        if (fraBakgrunn) return;
+        if (!confirm('Lukke uten å lagre? Det du har skrevet forsvinner.')) return;
+    }
+    btSlettSakUtkast();
+    btLukkSakModal();
+}
+
+// ============================================
+// UTKAST AV SAK
+// ============================================
+// Det som skrives i saksvinduet, lagres fortløpende i nettleseren. Lastes siden
+// på nytt (Edge kan gjøre det med faner i bakgrunnen), åpnes vinduet igjen med
+// utkastet. Utkast eldre enn ett døgn brukes ikke.
+
+const BT_SAK_UTKAST = 'bt_sak_utkast';
+const BT_SAK_FELT = ['issueTittel', 'issueOmraade', 'issueKategori', 'issuePrioritet',
+    'issueStatus', 'issueAnsvarlig', 'issueBase', 'issueNyLogg'];
+var btSakStartverdier = null;
+var btUtkastSjekket = false;
+
+function btLesSakSkjema() {
+    var verdier = {};
+    BT_SAK_FELT.forEach(function(feltId) { verdier[feltId] = document.getElementById(feltId).value; });
+    return verdier;
+}
+
+function btSakSkjemaEndret() {
+    return !!btSakStartverdier && JSON.stringify(btLesSakSkjema()) !== JSON.stringify(btSakStartverdier);
+}
+
+function btLagreSakUtkast() {
+    if (!btSakStartverdier) return;
+    try {
+        if (btSakSkjemaEndret()) {
+            localStorage.setItem(BT_SAK_UTKAST, JSON.stringify({
+                sakId: btRedigererSakId, felt: btLesSakSkjema(), tid: Date.now()
+            }));
+        } else {
+            localStorage.removeItem(BT_SAK_UTKAST);
+        }
+    } catch (e) { /* lagring ikke tilgjengelig */ }
+}
+
+function btHentSakUtkast() {
+    try {
+        var utkast = JSON.parse(localStorage.getItem(BT_SAK_UTKAST) || 'null');
+        if (utkast && utkast.felt && Date.now() - utkast.tid < 24 * 3600 * 1000) return utkast;
+    } catch (e) { /* lagring ikke tilgjengelig */ }
+    return null;
+}
+
+function btSlettSakUtkast() {
+    try { localStorage.removeItem(BT_SAK_UTKAST); } catch (e) { /* lagring ikke tilgjengelig */ }
+}
+
+// Kalles når sakene er lastet: et utkast fra før siden ble lastet på nytt åpnes igjen.
+function btGjenopprettSakUtkast() {
+    if (btUtkastSjekket) return;
+    btUtkastSjekket = true;
+    var utkast = btHentSakUtkast();
+    if (!utkast) return;
+    if (utkast.sakId && !btSaker.some(function(s) { return s.id === utkast.sakId; })) return;
+    btAapneSakModal(utkast.sakId || null, utkast.felt.issueBase);
 }
 
 function btLagreFraModal() {
@@ -562,7 +644,10 @@ function btLagreFraModal() {
     }
 
     localStorage.setItem('bt_sist_base', base);
-    btLagre(BT_SAKER, sak, btLukkSakModal);
+    btLagre(BT_SAKER, sak, function() {
+        btSlettSakUtkast();
+        btLukkSakModal();
+    });
 }
 
 // ============================================
@@ -871,7 +956,11 @@ function btAvbrytNiceToKnow() {
     return true;
 }
 
-function btLukkNiceToKnow() {
+function btLukkNiceToKnow(fraBakgrunn) {
+    // Klikk utenfor vinduet skal ikke avbryte en redigering med endringer.
+    var endret = btRedigererNiceToKnow &&
+        document.getElementById('ntkTekst').value !== (btNiceToKnow.tekst || '');
+    if (fraBakgrunn && endret) return;
     if (btAvbrytNiceToKnow()) document.getElementById('ntkModal').style.display = 'none';
 }
 
@@ -1552,15 +1641,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target.classList.contains('base-felt')) btLagreBaseFelt(e.target);
     });
 
-    document.getElementById('issueModalClose').addEventListener('click', btLukkSakModal);
+    document.getElementById('issueModalClose').addEventListener('click', function() { btForsokLukkSakModal(false); });
     document.getElementById('issueModal').addEventListener('click', function(e) {
-        if (e.target === this) btLukkSakModal();
+        if (e.target === this) btForsokLukkSakModal(true);
     });
     document.getElementById('issueSaveBtn').addEventListener('click', btLagreFraModal);
+    document.getElementById('issueModal').addEventListener('input', btLagreSakUtkast);
+    document.getElementById('issueModal').addEventListener('change', btLagreSakUtkast);
     document.getElementById('issueDeleteBtn').addEventListener('click', function() {
         if (!btRedigererSakId) return;
         if (!confirm('Slette denne saken permanent? Bruk heller status «Lukket» hvis den er ferdig.')) return;
-        btSlett(BT_SAKER, btRedigererSakId, btLukkSakModal);
+        btSlett(BT_SAKER, btRedigererSakId, function() {
+            btSlettSakUtkast();
+            btLukkSakModal();
+        });
     });
 
     // Nice to know: popup-vindu fra knappen øverst til høyre
@@ -1569,12 +1663,12 @@ document.addEventListener('DOMContentLoaded', function() {
         btRenderNiceToKnow();
         ntkModal.style.display = 'flex';
     });
-    document.getElementById('ntkLukk').addEventListener('click', btLukkNiceToKnow);
+    document.getElementById('ntkLukk').addEventListener('click', function() { btLukkNiceToKnow(false); });
     ntkModal.addEventListener('click', function(e) {
-        if (e.target === ntkModal) btLukkNiceToKnow();
+        if (e.target === ntkModal) btLukkNiceToKnow(true);
     });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && ntkModal.style.display === 'flex') btLukkNiceToKnow();
+        if (e.key === 'Escape' && ntkModal.style.display === 'flex') btLukkNiceToKnow(false);
     });
     document.getElementById('ntkRediger').addEventListener('click', function() { btSettNiceToKnowRedigering(true); });
     document.getElementById('ntkLagre').addEventListener('click', btLagreNiceToKnow);
@@ -1612,6 +1706,7 @@ document.addEventListener('DOMContentLoaded', function() {
     btLytt(BT_SAKER, function(liste) {
         btSaker = liste.map(btNormaliserSak);
         btRenderIssueBoard();
+        btGjenopprettSakUtkast();
     }, 'issueBoard-' + BT_BASER[0]);
     btLytt(BT_STATUS, function(liste) {
         btBaseStatus = {};
