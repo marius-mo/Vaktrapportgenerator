@@ -122,6 +122,16 @@ function sanitizeForFilename(text) {
         .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
 }
 
+// Mappen der alle rapporter lagres som PDF. Siden viser bare siste rapport;
+// eldre rapporter hentes herfra.
+const SHAREPOINT_RAPPORTMAPPE = 'https://airliftas.sharepoint.com/:f:/r/sites/Technical/Shared%20Documents/Part-145/Planning/Status%20reports%20-%20Handover?csf=1&web=1&e=c1DCC7';
+
+function sharepointHenvisningHtml() {
+    return '<p class="sharepoint-henvisning">Eldre rapporter finner du i SharePoint: ' +
+        '<a href="' + SHAREPOINT_RAPPORTMAPPE + '" target="_blank" rel="noopener noreferrer">' +
+        'Status reports – Handover</a></p>';
+}
+
 // Unngår at tekst fra brukere tolkes som HTML når den settes inn med innerHTML.
 function escapeHtml(text) {
     return String(text == null ? '' : text)
