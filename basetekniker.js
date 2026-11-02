@@ -669,10 +669,10 @@ function btByggBaseSeksjoner() {
                 '<button type="button" class="btn btn-success ny-sak-btn" data-base="' + base + '">Ny sak</button>' +
             '</div>' +
             '<div class="base-status-felt">' +
-                '<label for="baseStatus-' + base + '">Basestatus</label>' +
+                '<label for="baseStatus-' + base + '">Base</label>' +
                 '<textarea id="baseStatus-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="status"' +
                     ' placeholder="Status på basen nå: hangar, utstyr, bemanning, avtaler …"></textarea>' +
-                '<label for="baseTools-' + base + '">Tool status</label>' +
+                '<label for="baseTools-' + base + '">Tools</label>' +
                 '<textarea id="baseTools-' + base + '" class="bt-input base-felt" data-base="' + base + '" data-felt="tools"' +
                     ' placeholder="f.eks. Alle tools innenfor kalibrering. TQ-0051 due 01.11, sendt til kalibrering."></textarea>' +
             '</div>' +
@@ -1244,8 +1244,8 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
             seksjonstittel((base || 'Uten base') + ' – ' +
                 (iGruppe.length === 1 ? '1 åpen sak' : iGruppe.length + ' åpne saker'));
             if (oversikt[base]) {
-                etikettTekst('Basestatus', oversikt[base].status || '-');
-                etikettTekst('Tool status', oversikt[base].tools || '-');
+                etikettTekst('Base', oversikt[base].status || '-');
+                etikettTekst('Tools', oversikt[base].tools || '-');
                 y += 1.5;
             }
         } else {
