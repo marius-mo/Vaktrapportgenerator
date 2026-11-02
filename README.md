@@ -29,9 +29,17 @@ Tavlen oppdateres i sanntid mellom teknikere via Firestore. Saker ligger i
 `bt_saker`, basestatus og ettersyn i `bt_status`, og rapporter i `bt_rapporter`.
 Uten Firebase-config faller siden tilbake på `localStorage` i egen nettleser.
 
+## Tidligere rapporter
+
+Begge sidene viser bare **siste** ferdige rapport nederst på siden (den operative
+siden viser i tillegg utkast som pågår). Eldre rapporter ligger i SharePoint, og
+siden lenker dit: *Technical → Part-145 → Planning → Status reports – Handover*.
+Lenken settes i `SHAREPOINT_RAPPORTMAPPE` i `common.js`. Eldre rapporter slettes
+ikke fra databasen, de vises bare ikke. Utkast eldre enn 14 dager slettes automatisk.
+
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102g`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102h`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 

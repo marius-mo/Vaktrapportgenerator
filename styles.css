@@ -773,12 +773,6 @@ header h1 {
   margin-bottom: var(--space-4);
 }
 
-.archive-link-wrapper {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-6) var(--space-8);
-}
-
 .modal-backdrop {
   display: flex;
   position: fixed;
@@ -2148,6 +2142,21 @@ textarea.bt-input {
   color: var(--text-secondary);
 }
 
+.sharepoint-henvisning {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.sharepoint-henvisning a {
+  color: var(--color-primary-700);
+  font-weight: var(--font-semibold);
+}
+
+[data-theme="dark"] .sharepoint-henvisning a {
+  color: var(--color-primary-500);
+}
+
 /* ============================================
    KOMPAKT OPPSETT
    Strammere avstander og mindre knapper på begge rapportsidene,
@@ -2366,10 +2375,6 @@ header h1 {
 
 .report-group-title {
   margin: var(--space-2) 0 var(--space-1);
-}
-
-.archive-link-wrapper {
-  padding: var(--space-3) var(--space-5);
 }
 
 .modal-box {

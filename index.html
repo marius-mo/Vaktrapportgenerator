@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261102g">
+    <link rel="stylesheet" href="styles.css?v=20261102h">
 </head>
 <body>
     <script>
@@ -247,7 +247,7 @@
         </form>
 
         <div class="register-section">
-            <h2>Tidligere rapporter</h2>
+            <h2>Siste rapport</h2>
             <div class="register-filters">
                 <label for="reportBaseFilter">Filtrer på base:</label>
                 <select id="reportBaseFilter">
@@ -255,25 +255,10 @@
                 </select>
             </div>
             <div id="reportRegister" class="report-register">
-                <p class="no-reports">Ingen tidligere rapporter registrert</p>
+                <p class="no-reports">Laster...</p>
             </div>
         </div>
 
-        <div class="archive-link-wrapper">
-            <button type="button" id="openArchive" class="btn btn-neutral">Arkiv</button>
-        </div>
-    </div>
-
-    <div id="archiveModal" class="modal-backdrop" style="display: none;">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h2>Arkiv <span class="modal-header-hint">(rapporter eldre enn 1 måned)</span></h2>
-                <button type="button" id="closeArchive" class="modal-close" aria-label="Lukk arkiv">&times;</button>
-            </div>
-            <div id="archiveRegister" class="report-register">
-                <p class="no-reports">Ingen arkiverte rapporter</p>
-            </div>
-        </div>
     </div>
 
     <!-- Firebase: erstatt verdiene under med din egen config fra Firebase Console -->
@@ -290,8 +275,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="common.js?v=20261102g"></script>
-    <script src="script.js?v=20261102g"></script>
+    <script src="common.js?v=20261102h"></script>
+    <script src="script.js?v=20261102h"></script>
 </body>
 </html>
 

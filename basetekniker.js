@@ -1475,7 +1475,8 @@ function btLastRapporter() {
     if (btHarSky()) {
         window.firestoreDb.collection(BT_RAPPORTER)
             .orderBy('timestamp', 'desc')
-            .limit(30)
+            // Bare siste rapport vises; eldre rapporter ligger i SharePoint.
+            .limit(1)
             .get()
             .then(function(snapshot) {
                 btRapporter = snapshot.docs.map(function(d) {
@@ -1524,11 +1525,12 @@ function btRenderRapportRegister() {
     if (!div) return;
 
     if (!btRapporter || btRapporter.length === 0) {
-        div.innerHTML = '<p class="no-reports">Ingen tidligere rapporter registrert</p>';
+        div.innerHTML = '<p class="no-reports">Ingen rapporter registrert</p>' + sharepointHenvisningHtml();
         return;
     }
 
-    div.innerHTML = btRapporter.map(function(rapport, index) {
+    // Bare siste rapport vises; eldre rapporter ligger i SharePoint.
+    div.innerHTML = btRapporter.slice(0, 1).map(function(rapport, index) {
         var antall = (rapport.aapneSaker || []).length;
         var forfalt = rapport.tools
             ? rapport.tools.perBase.reduce(function(sum, s) { return sum + s.forfalt; }, 0) : 0;
@@ -1549,7 +1551,7 @@ function btRenderRapportRegister() {
                 '<button class="btn-small btn-delete" data-index="' + index + '">Slett</button>' +
             '</div>' +
         '</div>';
-    }).join('');
+    }).join('') + sharepointHenvisningHtml();
 
     div.querySelectorAll('.btn-pdf').forEach(function(btn) {
         btn.addEventListener('click', function() {
