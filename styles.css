@@ -1942,6 +1942,38 @@ textarea.bt-input {
   padding-left: var(--space-3);
 }
 
+.issue-card[data-id] {
+  cursor: pointer;
+}
+
+.issue-card:focus-visible {
+  outline: 3px solid var(--color-primary-300);
+  outline-offset: 2px;
+}
+
+/* Hele loggen vises på saksruten, nyeste først */
+.issue-card-logg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 3px solid var(--color-gray-200);
+  padding-left: var(--space-3);
+}
+
+.issue-card-logg-post {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.issue-card-logg-meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-right: var(--space-2);
+}
+
 .issue-card-actions {
   display: flex;
   align-items: center;

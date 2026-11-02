@@ -312,9 +312,41 @@ function btSorterSaker(saker) {
     });
 }
 
+// Statusendringer logges ikke lenger, siden status står på kortet. Eldre saker
+// kan ha slike poster; de skjules i visning og rapport, men slettes ikke.
+function btErStatusPost(post) {
+    return /^Status endret til /.test((post && post.tekst) || '');
+}
+
+function btSynligLogg(logg) {
+    return (logg || []).filter(function(post) {
+        return post && post.tekst && !btErStatusPost(post);
+    });
+}
+
+// Når saken ble lukket. Eldre saker har ikke feltet «lukket», så da brukes
+// statusposten i loggen eller sist oppdatert.
+function btLukketTid(sak) {
+    if (!sak || sak.status !== 'Lukket') return '';
+    if (sak.lukket) return sak.lukket;
+    var post = (sak.logg || []).filter(function(p) {
+        return p && p.tekst === 'Status endret til Lukket.';
+    }).pop();
+    return post ? post.tid : (sak.oppdatert || '');
+}
+
+// Lokal dato (YYYY-MM-DD), så saker lukket like etter midnatt havner på riktig dag.
+function btLokalDato(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+}
+
 function btSakKortHtml(sak) {
     var dager = btDagerSiden(sak.opprettet);
-    var sisteLogg = (sak.logg && sak.logg.length) ? sak.logg[sak.logg.length - 1] : null;
+    var logg = btSynligLogg(sak.logg).slice().reverse();
     var prioKlasse = sak.prioritet === 'Høy' ? 'prio-high'
         : (sak.prioritet === 'Lav' ? 'prio-low' : 'prio-normal');
 
@@ -325,7 +357,8 @@ function btSakKortHtml(sak) {
             '" data-status="' + escapeHtml(s) + '">' + escapeHtml(s) + '</button>';
     }).join('');
 
-    return '<div class="issue-card ' + prioKlasse + (sak.status === 'Lukket' ? ' is-closed' : '') + '">' +
+    return '<div class="issue-card ' + prioKlasse + (sak.status === 'Lukket' ? ' is-closed' : '') +
+        '" data-id="' + escapeHtml(sak.id) + '" tabindex="0" title="Åpne saken">' +
         '<div class="issue-card-main">' +
             '<div class="issue-card-top">' +
                 '<span class="issue-title">' + escapeHtml(sak.tittel || 'Uten tittel') + '</span>' +
@@ -337,10 +370,13 @@ function btSakKortHtml(sak) {
                 (sak.ansvarlig ? '<span class="issue-chip">' + escapeHtml(sak.ansvarlig) + '</span>' : '') +
                 '<span class="issue-age">' + (sak.status === 'Lukket' ? 'Lukket' : 'Åpen i ' + dager + ' d') + '</span>' +
             '</div>' +
-            (sisteLogg ? '<div class="issue-last-log">' +
-                escapeHtml(btFormatTidspunkt(sisteLogg.tid)) +
-                (sisteLogg.av ? ' · ' + escapeHtml(sisteLogg.av) : '') + ': ' +
-                escapeHtml(sisteLogg.tekst) + '</div>' : '') +
+            (logg.length ? '<div class="issue-card-logg">' + logg.map(function(post) {
+                return '<div class="issue-card-logg-post">' +
+                    '<span class="issue-card-logg-meta">' + escapeHtml(btFormatTidspunkt(post.tid)) +
+                    (post.av ? ' · ' + escapeHtml(post.av) : '') + '</span>' +
+                    '<span class="issue-card-logg-tekst">' + escapeHtml(post.tekst) + '</span>' +
+                '</div>';
+            }).join('') + '</div>' : '') +
         '</div>' +
         '<div class="issue-card-actions">' +
             '<div class="issue-status-group">' + statusKnapper + '</div>' +
@@ -398,11 +434,7 @@ function btEndreStatus(id, nyStatus) {
     var oppdatert = Object.assign({}, sak);
     oppdatert.status = nyStatus;
     oppdatert.oppdatert = btNaa();
-    oppdatert.logg = (sak.logg || []).concat([{
-        tid: btNaa(),
-        av: btAktivTekniker(),
-        tekst: 'Status endret til ' + nyStatus + '.'
-    }]);
+    oppdatert.lukket = nyStatus === 'Lukket' ? btNaa() : '';
     btSaker = btSaker.map(function(s) { return s.id === id ? oppdatert : s; });
     btLagre(BT_SAKER, oppdatert);
 }
@@ -499,9 +531,10 @@ function btAapneSakModal(id, nyBase) {
     document.getElementById('issueDeleteBtn').style.display = sak ? '' : 'none';
 
     var historikk = document.getElementById('issueLoggHistorikk');
-    if (sak && sak.logg && sak.logg.length) {
+    var synligLogg = sak ? btSynligLogg(sak.logg) : [];
+    if (synligLogg.length) {
         historikk.innerHTML = '<h3 class="report-group-title">Logg</h3>' +
-            sak.logg.slice().reverse().map(function(post) {
+            synligLogg.slice().reverse().map(function(post) {
                 return '<div class="issue-log-entry">' +
                     '<div class="issue-log-meta">' + escapeHtml(btFormatTidspunkt(post.tid)) +
                     (post.av ? ' · ' + escapeHtml(post.av) : '') + '</div>' +
@@ -630,12 +663,11 @@ function btLagreFraModal() {
         base: base,
         opprettet: eksisterende ? (eksisterende.opprettet || naa) : naa,
         oppdatert: naa,
+        lukket: nyStatus !== 'Lukket' ? ''
+            : (eksisterende && eksisterende.status === 'Lukket' ? btLukketTid(eksisterende) : naa),
         logg: (eksisterende && eksisterende.logg) ? eksisterende.logg.slice() : []
     };
 
-    if (eksisterende && eksisterende.status !== nyStatus) {
-        sak.logg.push({ tid: naa, av: btAktivTekniker(), tekst: 'Status endret til ' + nyStatus + '.' });
-    }
     if (nyLoggTekst) {
         sak.logg.push({ tid: naa, av: btAktivTekniker(), tekst: nyLoggTekst });
     }
@@ -984,11 +1016,8 @@ function btSamleRapportData() {
     var dato = document.getElementById('btDate').value;
 
     var aapne = btSorterSaker(btSaker.filter(btErAapen));
-    // Saker med loggaktivitet på valgt dato regnes som endret denne vakten.
-    var endretIDag = btSaker.filter(function(s) {
-        return (s.logg || []).some(function(post) {
-            return (post.tid || '').slice(0, 10) === dato;
-        });
+    var lukketIDag = btSaker.filter(function(s) {
+        return s.status === 'Lukket' && btLokalDato(btLukketTid(s)) === dato;
     });
 
     return {
@@ -1000,7 +1029,7 @@ function btSamleRapportData() {
             return { base: base, status: b.status || '', tools: b.tools || '' };
         }),
         aapneSaker: aapne.map(btSakSnapshot),
-        endringer: endretIDag.map(btSakSnapshot),
+        lukkedeSaker: lukketIDag.map(btSakSnapshot),
         ettersynListe: btSorterEttersyn(btEttersynListe).map(function(e) {
             return {
                 reg: e.reg || '', type: e.type || '', base: e.base || '', startet: e.startet || '',
@@ -1012,7 +1041,8 @@ function btSamleRapportData() {
 }
 
 function btSakSnapshot(sak) {
-    var sisteLogg = (sak.logg && sak.logg.length) ? sak.logg[sak.logg.length - 1] : null;
+    var logg = btSynligLogg(sak.logg);
+    var sisteLogg = logg.length ? logg[logg.length - 1] : null;
     return {
         tittel: sak.tittel || '',
         base: sak.base || '',
@@ -1023,7 +1053,10 @@ function btSakSnapshot(sak) {
         ansvarlig: sak.ansvarlig || '',
         dagerAapen: btDagerSiden(sak.opprettet),
         sisteLogg: sisteLogg ? sisteLogg.tekst : '',
-        sisteLoggTid: sisteLogg ? sisteLogg.tid : ''
+        sisteLoggTid: sisteLogg ? sisteLogg.tid : '',
+        logg: logg.map(function(post) {
+            return { tid: post.tid || '', av: post.av || '', tekst: post.tekst };
+        })
     };
 }
 
@@ -1160,6 +1193,18 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
         });
     }
 
+    // Hele loggen til en sak, nyeste først. Eldre rapporter har bare siste post.
+    function loggPoster(sak) {
+        var poster = sak.logg ? sak.logg.slice().reverse()
+            : (sak.sisteLogg && !btErStatusPost({ tekst: sak.sisteLogg })
+                ? [{ tid: sak.sisteLoggTid, tekst: sak.sisteLogg }] : []);
+        poster.forEach(function(post) {
+            var meta = [btFormatTidspunkt(post.tid), post.av].filter(Boolean).join(' · ');
+            tekst((meta ? meta + ': ' : '') + post.tekst,
+                { storrelse: 8, farge: textSecondary, innrykk: 2, linjeHoyde: 3.8 });
+        });
+    }
+
     function tom(melding) {
         tekst(melding, { stil: 'italic', farge: textSecondary });
         y += 2;
@@ -1259,20 +1304,31 @@ function btTegnPdf(data, logoInfo, lagreIRegister) {
             tittelMedStatus((sak.prioritet === 'Høy' ? '[HØY] ' : '') + sak.tittel, sak.status);
             tekst([sak.omraade, sak.kategori, sak.ansvarlig || 'Ingen ansvarlig', 'åpen i ' + sak.dagerAapen + ' d']
                 .filter(Boolean).join('  ·  '), { storrelse: 8, farge: textSecondary, innrykk: 2, linjeHoyde: 4 });
-            if (sak.sisteLogg) {
-                tekst('Siste: ' + sak.sisteLogg, { storrelse: 8, farge: textSecondary, innrykk: 2, linjeHoyde: 3.8 });
-            }
+            loggPoster(sak);
             y += 2.5;
         });
     });
 
-    // --- Endringer denne vakten ---
-    var endringer = data.endringer || [];
-    seksjonstittel('Endringer denne vakten (' + endringer.length + ')');
-    if (endringer.length === 0) {
-        tom('Ingen saker ble opprettet eller oppdatert denne vakten.');
-    } else {
-        endringer.forEach(function(sak) {
+    // --- Lukkede saker denne vakten (eldre rapporter: endringer denne vakten) ---
+    if (data.lukkedeSaker) {
+        seksjonstittel('Lukkede saker denne vakten (' + data.lukkedeSaker.length + ')');
+        if (data.lukkedeSaker.length === 0) {
+            tom('Ingen saker ble lukket denne vakten.');
+        }
+        data.lukkedeSaker.forEach(function(sak) {
+            var base = btNormaliserBase(sak.base);
+            tittelMedStatus((base ? base + ' · ' : '') + sak.tittel, sak.status);
+            tekst([sak.omraade, sak.kategori, sak.ansvarlig].filter(Boolean).join('  ·  '),
+                { storrelse: 8, farge: textSecondary, innrykk: 2, linjeHoyde: 4 });
+            loggPoster(sak);
+            y += 2.5;
+        });
+    } else if (data.endringer) {
+        seksjonstittel('Endringer denne vakten (' + data.endringer.length + ')');
+        if (data.endringer.length === 0) {
+            tom('Ingen saker ble opprettet eller oppdatert denne vakten.');
+        }
+        data.endringer.forEach(function(sak) {
             var base = btNormaliserBase(sak.base) || btNormaliserBase(data.base);
             tekst((base ? base + ' · ' : '') + sak.tittel + ' (' + sak.omraade + ') - ' + sak.status +
                 (sak.sisteLogg ? ': ' + sak.sisteLogg : ''), { storrelse: 8.5, innrykk: 2, linjeHoyde: 4 });
@@ -1630,7 +1686,12 @@ document.addEventListener('DOMContentLoaded', function() {
     var baseSeksjoner = document.getElementById('baseSeksjoner');
     baseSeksjoner.addEventListener('click', function(e) {
         var knapp = e.target.closest('button');
-        if (!knapp) return;
+        if (!knapp) {
+            // Klikk på selve saksruten åpner saken, men ikke når man markerer tekst.
+            var kort = e.target.closest('.issue-card');
+            if (kort && !String(window.getSelection() || '')) btAapneSakModal(kort.getAttribute('data-id'));
+            return;
+        }
         if (knapp.classList.contains('issue-status-btn')) {
             btEndreStatus(knapp.getAttribute('data-id'), knapp.getAttribute('data-status'));
         } else if (knapp.classList.contains('issue-open-btn')) {
@@ -1641,6 +1702,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     baseSeksjoner.addEventListener('change', function(e) {
         if (e.target.classList.contains('base-felt')) btLagreBaseFelt(e.target);
+    });
+    baseSeksjoner.addEventListener('keydown', function(e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('issue-card')) {
+            e.preventDefault();
+            btAapneSakModal(e.target.getAttribute('data-id'));
+        }
     });
 
     document.getElementById('issueModalClose').addEventListener('click', function() { btForsokLukkSakModal(false); });

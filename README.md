@@ -14,8 +14,9 @@ Basetekniker-siden dekker alle tre baser (BGO, TOS, HFT), og tilstanden lever
 videre mellom vakter:
 
 - **Én seksjon per base** med feltene Base og Tools og utestående saker for
-  basen. Saker har kategori, prioritet, ansvarlig og loggtråd, og står til noen
-  setter dem til «Lukket».
+  basen. Saker har kategori, prioritet, ansvarlig og logg, og står til noen
+  setter dem til «Lukket». Hele loggen vises på saksruten og i PDF-en, og et
+  klikk på ruten åpner saken. Statusendringer logges ikke.
 - **Nice to know**, en knapp øverst til høyre som åpner et popup-vindu med felles
   oppslagsinfo som kundenumre og telefonnumre. Redigeres med «Rediger»-knappen og
   tas ikke med i PDF-en. Telefonnumre og e-post blir klikkbare.
@@ -23,7 +24,7 @@ videre mellom vakter:
   med status Planlegging, Pågår eller Ferdig. Det som tidligere
   het «Større reparasjoner», er flyttet hit automatisk med status Planlegging.
 - **Vaktrapport ved vaktslutt** tar et øyeblikksbilde av basene og ettersyn, pluss
-  hva som ble endret denne vakten.
+  saker som ble lukket denne vakten.
 
 Tavlen oppdateres i sanntid mellom teknikere via Firestore. Saker ligger i
 `bt_saker`, basestatus og ettersyn i `bt_status`, og rapporter i `bt_rapporter`.
@@ -39,7 +40,7 @@ ikke fra databasen, de vises bare ikke. Utkast eldre enn 14 dager slettes automa
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102i`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102j`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 
