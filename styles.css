@@ -2097,6 +2097,91 @@ textarea.bt-input {
   }
 }
 
+/* --- Nice to know (sammenleggbar boks) --- */
+
+.form-section.nice-to-know {
+  padding: 0;
+}
+
+.nice-to-know summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+}
+
+.nice-to-know summary::-webkit-details-marker {
+  display: none;
+}
+
+.nice-to-know summary::before {
+  content: '▸';
+  color: var(--color-primary-700);
+  transition: transform var(--duration-fast) var(--ease-in-out);
+}
+
+.nice-to-know[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.ntk-tittel {
+  font-weight: var(--font-bold);
+  font-size: var(--text-lg);
+  color: var(--color-primary-700);
+}
+
+[data-theme="dark"] .ntk-tittel,
+[data-theme="dark"] .nice-to-know summary::before {
+  color: var(--color-primary-500);
+}
+
+.ntk-hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.ntk-innhold {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.ntk-tekst {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+  padding: var(--space-3);
+  background: var(--bg-secondary);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+}
+
+.ntk-tekst a {
+  color: var(--color-primary-700);
+  font-weight: var(--font-semibold);
+}
+
+#ntkTekst {
+  min-height: 140px;
+  line-height: var(--leading-relaxed);
+}
+
+.ntk-knapper {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.ntk-meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 /* ============================================
    KOMPAKT OPPSETT
    Strammere avstander og mindre knapper på begge rapportsidene,
