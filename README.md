@@ -13,7 +13,7 @@ teknikersiden, og bruk «Tilbake til operativ vakt» øverst der for å gå tilb
 Basetekniker-siden dekker alle tre baser (BGO, TOS, HFT), og tilstanden lever
 videre mellom vakter:
 
-- **Én seksjon per base** med basestatus, tool status og utestående saker for
+- **Én seksjon per base** med feltene Base og Tools og utestående saker for
   basen. Saker har kategori, prioritet, ansvarlig og loggtråd, og står til noen
   setter dem til «Lukket».
 - **Nice to know**, en knapp øverst til høyre som åpner et popup-vindu med felles
@@ -39,7 +39,7 @@ ikke fra databasen, de vises bare ikke. Utkast eldre enn 14 dager slettes automa
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102h`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261102i`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 
