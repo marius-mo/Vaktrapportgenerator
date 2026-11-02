@@ -855,12 +855,24 @@ function btSettNiceToKnowRedigering(paa) {
     document.getElementById('ntkLagre').style.display = paa ? '' : 'none';
     document.getElementById('ntkAvbryt').style.display = paa ? '' : 'none';
     if (paa) {
-        document.getElementById('niceToKnow').open = true;
         felt.value = btNiceToKnow.tekst || '';
         felt.focus();
     } else {
         btRenderNiceToKnow();
     }
+}
+
+// Avslutter redigering. Ulagrede endringer forkastes bare hvis brukeren bekrefter.
+function btAvbrytNiceToKnow() {
+    if (!btRedigererNiceToKnow) return true;
+    var endret = document.getElementById('ntkTekst').value !== (btNiceToKnow.tekst || '');
+    if (endret && !confirm('Forkaste endringene?')) return false;
+    btSettNiceToKnowRedigering(false);
+    return true;
+}
+
+function btLukkNiceToKnow() {
+    if (btAvbrytNiceToKnow()) document.getElementById('ntkModal').style.display = 'none';
 }
 
 function btLagreNiceToKnow() {
@@ -1551,19 +1563,22 @@ document.addEventListener('DOMContentLoaded', function() {
         btSlett(BT_SAKER, btRedigererSakId, btLukkSakModal);
     });
 
-    // Nice to know: husk om boksen var åpen sist
-    var niceToKnow = document.getElementById('niceToKnow');
-    try { niceToKnow.open = localStorage.getItem('bt_ntk_aapen') === '1'; } catch (e) { /* ikke tilgjengelig */ }
-    niceToKnow.addEventListener('toggle', function() {
-        try { localStorage.setItem('bt_ntk_aapen', niceToKnow.open ? '1' : '0'); } catch (e) { /* ikke tilgjengelig */ }
+    // Nice to know: popup-vindu fra knappen øverst til høyre
+    var ntkModal = document.getElementById('ntkModal');
+    document.getElementById('ntkKnapp').addEventListener('click', function() {
+        btRenderNiceToKnow();
+        ntkModal.style.display = 'flex';
+    });
+    document.getElementById('ntkLukk').addEventListener('click', btLukkNiceToKnow);
+    ntkModal.addEventListener('click', function(e) {
+        if (e.target === ntkModal) btLukkNiceToKnow();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && ntkModal.style.display === 'flex') btLukkNiceToKnow();
     });
     document.getElementById('ntkRediger').addEventListener('click', function() { btSettNiceToKnowRedigering(true); });
     document.getElementById('ntkLagre').addEventListener('click', btLagreNiceToKnow);
-    document.getElementById('ntkAvbryt').addEventListener('click', function() {
-        var endret = document.getElementById('ntkTekst').value !== (btNiceToKnow.tekst || '');
-        if (endret && !confirm('Forkaste endringene?')) return;
-        btSettNiceToKnowRedigering(false);
-    });
+    document.getElementById('ntkAvbryt').addEventListener('click', btAvbrytNiceToKnow);
     btRenderNiceToKnow();
 
     // Ettersyn

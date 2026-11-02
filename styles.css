@@ -2097,54 +2097,13 @@ textarea.bt-input {
   }
 }
 
-/* --- Nice to know (sammenleggbar boks) --- */
+/* --- Nice to know (popup fra knappen øverst til høyre) --- */
 
-.form-section.nice-to-know {
-  padding: 0;
-}
-
-.nice-to-know summary {
+.back-link-bar {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  cursor: pointer;
-  list-style: none;
-}
-
-.nice-to-know summary::-webkit-details-marker {
-  display: none;
-}
-
-.nice-to-know summary::before {
-  content: '▸';
-  color: var(--color-primary-700);
-  transition: transform var(--duration-fast) var(--ease-in-out);
-}
-
-.nice-to-know[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.ntk-tittel {
-  font-weight: var(--font-bold);
-  font-size: var(--text-lg);
-  color: var(--color-primary-700);
-}
-
-[data-theme="dark"] .ntk-tittel,
-[data-theme="dark"] .nice-to-know summary::before {
-  color: var(--color-primary-500);
-}
-
-.ntk-hint {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.ntk-innhold {
-  padding: 0 var(--space-4) var(--space-4);
 }
 
 .ntk-tekst {
@@ -2170,14 +2129,11 @@ textarea.bt-input {
 }
 
 .ntk-knapper {
-  display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
 }
 
 .ntk-meta {
+  margin-right: auto;
   font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
