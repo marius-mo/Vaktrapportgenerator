@@ -370,19 +370,21 @@ function btSakKortHtml(sak) {
                 (sak.ansvarlig ? '<span class="issue-chip">' + escapeHtml(sak.ansvarlig) + '</span>' : '') +
                 '<span class="issue-age">' + (sak.status === 'Lukket' ? 'Lukket' : 'Åpen i ' + dager + ' d') + '</span>' +
             '</div>' +
-            (logg.length ? '<div class="issue-card-logg">' + logg.map(function(post) {
-                return '<div class="issue-card-logg-post">' +
-                    '<span class="issue-card-logg-meta">' + escapeHtml(btFormatTidspunkt(post.tid)) +
-                    (post.av ? ' · ' + escapeHtml(post.av) : '') + '</span>' +
-                    '<span class="issue-card-logg-tekst">' + escapeHtml(post.tekst) + '</span>' +
-                '</div>';
-            }).join('') + '</div>' : '') +
         '</div>' +
         '<div class="issue-card-actions">' +
             '<div class="issue-status-group">' + statusKnapper + '</div>' +
             '<button type="button" class="btn-small btn-view issue-open-btn" data-id="' +
                 escapeHtml(sak.id) + '">Åpne</button>' +
         '</div>' +
+        // Loggen ligger under resten av saken i full bredde: tid og navn på egen
+        // linje, teksten under.
+        (logg.length ? '<div class="issue-card-logg">' + logg.map(function(post) {
+            return '<div class="issue-card-logg-post">' +
+                '<div class="issue-card-logg-meta">' + escapeHtml(btFormatTidspunkt(post.tid)) +
+                (post.av ? ' · ' + escapeHtml(post.av) : '') + '</div>' +
+                '<div class="issue-card-logg-tekst">' + escapeHtml(post.tekst) + '</div>' +
+            '</div>';
+        }).join('') + '</div>' : '') +
     '</div>';
 }
 
