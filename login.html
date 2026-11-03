@@ -181,6 +181,16 @@
             var input = document.getElementById('password');
             var errorEl = document.getElementById('loginError');
 
+            // Etter innlogging sendes man til siden man prøvde å åpne, f.eks.
+            // basetekniker.html. Bare kjente sider godtas, så lenken ikke kan
+            // brukes til å sende folk videre til andre nettsteder.
+            var KJENTE_SIDER = ['index.html', 'basetekniker.html'];
+            function nesteSide() {
+                var neste = '';
+                try { neste = new URLSearchParams(window.location.search).get('neste') || ''; } catch (e) { /* gammel nettleser */ }
+                return KJENTE_SIDER.indexOf(neste) !== -1 ? neste : 'index.html';
+            }
+
             // Sikrer fokus i feltet også i nettlesere som ignorerer autofocus.
             setTimeout(function () {
                 input.focus();
@@ -192,7 +202,7 @@
                 errorEl.classList.remove('visible');
                 if (input.value === PASSWORD) {
                     sessionStorage.setItem('vaktrapport_auth', '1');
-                    window.location.href = 'index.html';
+                    window.location.href = nesteSide();
                 } else {
                     errorEl.classList.add('visible');
                     input.value = '';
