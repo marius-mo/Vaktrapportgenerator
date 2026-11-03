@@ -583,13 +583,10 @@ function btLukkSakModal() {
     btFrigjorVedleggUrler();
 }
 
-// Lukking brukeren ber om. Et klikk utenfor vinduet (f.eks. når man klikker seg
-// tilbake fra et annet program) lukker aldri et vindu med uendret innhold.
-function btForsokLukkSakModal(fraBakgrunn) {
-    if (btSakSkjemaEndret()) {
-        if (fraBakgrunn) return;
-        if (!confirm('Lukke uten å lagre? Det du har skrevet forsvinner.')) return;
-    }
+// Saksvinduet lukkes bare med × (eller etter Lagre/Slett). Klikk utenfor
+// vinduet gjør ingenting, så det man skriver ikke forsvinner ved et feiltrykk.
+function btForsokLukkSakModal() {
+    if (btSakSkjemaEndret() && !confirm('Lukke uten å lagre? Det du har skrevet forsvinner.')) return;
     btSlettSakUtkast();
     btLukkSakModal();
 }
@@ -2056,10 +2053,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    document.getElementById('issueModalClose').addEventListener('click', function() { btForsokLukkSakModal(false); });
-    document.getElementById('issueModal').addEventListener('click', function(e) {
-        if (e.target === this) btForsokLukkSakModal(true);
-    });
+    document.getElementById('issueModalClose').addEventListener('click', btForsokLukkSakModal);
     document.getElementById('issueSaveBtn').addEventListener('click', btLagreFraModal);
     document.querySelectorAll('.vedlegg-velg').forEach(function(knapp) {
         knapp.addEventListener('click', function() {
