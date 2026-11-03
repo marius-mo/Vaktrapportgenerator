@@ -12,6 +12,9 @@ teknikersiden, og bruk «Tilbake til operativ vakt» øverst der for å gå tilb
   i dokumentet `live-<base>` i `vaktrapporter` og vises med en gang hos alle som har valgt
   samme base. Det finnes ingen utkast. Ved vaktslutt eksporteres PDF, og siste PDF ligger
   i arkivet nederst. «Nullstill basen» tømmer live-statusen for basen (spør først).
+  Vedlegg lagres ikke live. Bilder vises i PDF-en; PDF-vedlegg legges bakerst i rapporten
+  (med `pdf-lib`), navnet i vedleggslista blir en lenke dit, og fila legges også ved som
+  filvedlegg i PDF-en så den kan lastes ned for seg.
 - **Basetekniker** (`basetekniker.html`) – levende statustavle for teknisk vedlikehold.
 
 Basetekniker-siden dekker alle tre baser (BGO, TOS, HFT), og tilstanden lever
@@ -48,7 +51,7 @@ ikke fra databasen, de vises bare ikke. Gamle utkast (fra før live-løsningen) 
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261103b`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261103c`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 

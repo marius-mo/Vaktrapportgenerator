@@ -307,11 +307,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateUploadedFilesDisplay();
                 };
                 reader.readAsDataURL(file);
-            } else if (file.type === 'application/pdf') {
+            } else if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+                // Selve fila tas vare på, så PDF-en kan legges inn i rapporten ved eksport.
                 uploadedFiles.push({
                     name: file.name,
-                    type: file.type,
+                    type: 'application/pdf',
                     data: null,
+                    fil: file,
                     isImage: false
                 });
                 updateUploadedFilesDisplay();
@@ -1228,6 +1230,7 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     yPos = heliCardY + heliCardHeight + 6;
     
     // Add uploaded files/attachments
+    const pdfVedlegg = [];
     if (files && files.length > 0) {
         // Check if we need a new page
         if (yPos > pageHeight - bottomMargin - 30) {
@@ -1246,6 +1249,14 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         doc.setTextColor(primaryBlueDark[0], primaryBlueDark[1], primaryBlueDark[2]);
         doc.text('Vedlegg', leftMargin, vedleggCardY);
         yPos += 8;
+
+        if (files.some(f => !f.isImage && f.fil)) {
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+            doc.text('PDF-vedlegg ligger bakerst i rapporten: klikk på navnet. De kan også lastes ned fra vedleggspanelet i PDF-leseren.', leftMargin, yPos - 2);
+            yPos += 4;
+        }
         
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
@@ -1313,9 +1324,22 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
                 }
                 
                 doc.setFontSize(9);
-                doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
                 doc.setFont('helvetica', 'normal');
-                doc.text(`📄 ${file.name}`, leftMargin + 3, yPos);
+                if (file.fil) {
+                    // Lenken til vedlegget legges på etter at PDF-en er satt sammen (vaktLeggVedPdfVedlegg).
+                    doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+                    doc.text(`PDF:  ${file.name}`, leftMargin + 3, yPos);
+                    doc.setFontSize(8);
+                    doc.text('Åpne vedlegg >', leftMargin + contentWidth - 3, yPos, { align: 'right' });
+                    pdfVedlegg.push({
+                        fil: file.fil, navn: file.name, side: doc.internal.getNumberOfPages(),
+                        x: leftMargin, y: yPos - 3, b: contentWidth, h: 6
+                    });
+                } else {
+                    doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
+                    doc.text(`PDF:  ${file.name}`, leftMargin + 3, yPos);
+                }
+                doc.setTextColor(textPrimary[0], textPrimary[1], textPrimary[2]);
                 yPos += 7;
             }
         });
@@ -1382,9 +1406,81 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
         doc.line(0, footerY, pageWidth, footerY);
     }
     
-    // Save PDF
-    doc.save(filename);
-    window.dispatchEvent(new Event('vaktrapport:pdfExported'));
+    // Save PDF. PDF-vedlegg legges inn bakerst med lenke før nedlasting.
+    if (pdfVedlegg.length === 0) {
+        doc.save(filename);
+        window.dispatchEvent(new Event('vaktrapport:pdfExported'));
+        return;
+    }
+    vaktLeggVedPdfVedlegg(doc.output('arraybuffer'), pdfVedlegg)
+        .then(function(bytes) {
+            vaktLastNedPdf(bytes, filename);
+            window.dispatchEvent(new Event('vaktrapport:pdfExported'));
+        })
+        .catch(function(err) {
+            console.error('Kunne ikke legge ved PDF-vedlegg:', err);
+            alert('PDF-vedleggene kunne ikke legges inn i rapporten. Rapporten lastes ned uten dem – legg dem ved e-posten manuelt.');
+            doc.save(filename);
+            window.dispatchEvent(new Event('vaktrapport:pdfExported'));
+        });
+}
+
+// Laster ned ferdige PDF-bytes med riktig filnavn.
+function vaktLastNedPdf(bytes, filnavn) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    const lenke = document.createElement('a');
+    lenke.href = url;
+    lenke.download = filnavn;
+    document.body.appendChild(lenke);
+    lenke.click();
+    lenke.remove();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 30000);
+}
+
+// Legger PDF-vedleggene inn i rapporten med pdf-lib:
+//  - sidene i vedlegget kopieres inn bakerst i rapporten,
+//  - navnet i vedleggslista blir en lenke til første side av vedlegget
+//    (virker i alle PDF-lesere, også for de som får rapporten på e-post),
+//  - fila legges også ved som filvedlegg, så den kan lastes ned for seg fra
+//    vedleggspanelet i PDF-leseren (Adobe, Chrome m.fl.).
+// Et vedlegg som ikke kan leses (f.eks. passordbeskyttet) legges bare ved som fil.
+async function vaktLeggVedPdfVedlegg(rapportBytes, vedlegg) {
+    if (!window.PDFLib) throw new Error('pdf-lib er ikke lastet');
+    const { PDFDocument, PDFName } = window.PDFLib;
+    const pdf = await PDFDocument.load(rapportBytes);
+    const mmTilPt = 72 / 25.4;
+
+    for (const v of vedlegg) {
+        const bytes = new Uint8Array(await v.fil.arrayBuffer());
+        let forsteSide = null;
+        try {
+            const kilde = await PDFDocument.load(bytes, { ignoreEncryption: true });
+            const sider = await pdf.copyPages(kilde, kilde.getPageIndices());
+            sider.forEach(function(side) { pdf.addPage(side); });
+            if (sider.length) forsteSide = pdf.getPage(pdf.getPageCount() - sider.length);
+        } catch (err) {
+            console.warn('Kunne ikke kopiere sidene i ' + v.navn + ', legges bare ved som fil:', err);
+        }
+        await pdf.attach(bytes, v.navn, {
+            mimeType: 'application/pdf',
+            description: 'Vedlegg til vaktrapport',
+            creationDate: new Date(),
+            modificationDate: new Date()
+        });
+        if (forsteSide) {
+            const side = pdf.getPage(v.side - 1);
+            const hoyde = side.getHeight();
+            const lenke = pdf.context.obj({
+                Type: 'Annot',
+                Subtype: 'Link',
+                Rect: [v.x * mmTilPt, hoyde - (v.y + v.h) * mmTilPt, (v.x + v.b) * mmTilPt, hoyde - v.y * mmTilPt],
+                Border: [0, 0, 0],
+                Dest: [forsteSide.ref, PDFName.of('Fit')]
+            });
+            side.node.addAnnot(pdf.context.register(lenke));
+        }
+    }
+    return pdf.save();
 }
 
 // formatDate, formatDateForFilename og sanitizeForFilename ligger i common.js.
