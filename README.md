@@ -7,7 +7,11 @@ Skifterapport-generator for ukentlige vaktrapporter. Bruker Firebase Firestore f
 Siden har to generatorer. Velg «Basetekniker» under Vakttype for å komme til
 teknikersiden, og bruk «Tilbake til operativ vakt» øverst der for å gå tilbake:
 
-- **Operativ vakt** (`index.html`) – rapporten for LOS/Politi-vakt. Ett øyeblikksbilde per vakt.
+- **Operativ vakt** (`index.html`) – rapporten for LOS/Politi-vakt. Skjemaet er live per base:
+  alt som skrives (vakttype, personer, status, helikoptre, kontrollpunkter) lagres fortløpende
+  i dokumentet `live-<base>` i `vaktrapporter` og vises med en gang hos alle som har valgt
+  samme base. Det finnes ingen utkast. Ved vaktslutt eksporteres PDF, og siste PDF ligger
+  i arkivet nederst. «Nullstill basen» tømmer live-statusen for basen (spør først).
 - **Basetekniker** (`basetekniker.html`) – levende statustavle for teknisk vedlikehold.
 
 Basetekniker-siden dekker alle tre baser (BGO, TOS, HFT), og tilstanden lever
@@ -37,15 +41,14 @@ Uten Firebase-config faller siden tilbake på `localStorage` i egen nettleser.
 
 ## Tidligere rapporter
 
-Begge sidene viser bare **siste** ferdige rapport nederst på siden (den operative
-siden viser i tillegg utkast som pågår). Eldre rapporter ligger i SharePoint, og
+Begge sidene viser bare **siste** ferdige rapport (PDF) nederst på siden. Eldre rapporter ligger i SharePoint, og
 siden lenker dit: *Technical → Part-145 → Planning → Status reports – Handover*.
 Lenken settes i `SHAREPOINT_RAPPORTMAPPE` i `common.js`. Eldre rapporter slettes
-ikke fra databasen, de vises bare ikke. Utkast eldre enn 14 dager slettes automatisk.
+ikke fra databasen, de vises bare ikke. Gamle utkast (fra før live-løsningen) slettes automatisk etter 14 dager.
 
 Felles kode (tema, Firebase-oppsett, datoformatering) ligger i `common.js`.
 
-Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261103a`
+Skript og stilark lastes med et versjonsnummer, f.eks. `basetekniker.js?v=20261103b`
 i `index.html` og `basetekniker.html`. **Øk nummeret ved hver endring.** Ellers kan
 nettleseren bruke en gammel kopi av skriptet sammen med ny side, og siden virker ikke.
 

@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261103a">
+    <link rel="stylesheet" href="styles.css?v=20261103b">
 </head>
 <body>
     <script>
@@ -63,6 +63,7 @@
                         </select>
                     </div>
                 </div>
+                <p id="vaktLiveInfo" class="vakt-live-info" role="status" aria-live="polite">Velg base for å se og dele live status for vakten.</p>
 
                 <div class="form-group">
                     <label>Personer involvert:</label>
@@ -229,7 +230,6 @@
             </div>
 
             <div class="form-actions">
-                <button type="button" id="saveDraft" class="btn btn-neutral">Lagre utkast</button>
                 <button type="button" id="exportPdf" class="btn btn-success">Eksporter til PDF</button>
                 <button type="button" id="sendEmail" class="btn btn-neutral" disabled>Send e-post</button>
                 <a
@@ -241,13 +241,13 @@
                     aria-disabled="true"
                     tabindex="-1"
                 >Åpne SharePoint-mappe</a>
-                <button type="reset" class="btn btn-danger">Nullstill skjema</button>
+                <button type="button" id="resetLive" class="btn btn-danger">Nullstill basen</button>
             </div>
-            <p class="form-actions-note">Tips: Eksporter PDF først, og legg den ved manuelt i e-posten som åpnes.</p>
+            <p class="form-actions-note">Alt lagres fortløpende og deles med alle som har valgt samme base. Ved vaktslutt: eksporter PDF, og legg den ved manuelt i e-posten som åpnes. Vedlegg lagres ikke live, bare i PDF-en.</p>
         </form>
 
         <div class="register-section">
-            <h2>Siste rapport</h2>
+            <h2>Siste rapport (PDF)</h2>
             <div class="register-filters">
                 <label for="reportBaseFilter">Filtrer på base:</label>
                 <select id="reportBaseFilter">
@@ -275,8 +275,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="common.js?v=20261103a"></script>
-    <script src="script.js?v=20261103a"></script>
+    <script src="common.js?v=20261103b"></script>
+    <script src="script.js?v=20261103b"></script>
 </body>
 </html>
 
