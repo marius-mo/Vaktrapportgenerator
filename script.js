@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setDateToToday();
     
     // Function to handle helicopter checkbox change
-    function handleHelicopterChange(checkbox) {
+    function handleHelicopterChange(checkbox, utenFokus) {
         const helicopterId = checkbox.id;
         let textFieldId, statusDivId;
         
@@ -54,10 +54,12 @@ document.addEventListener('DOMContentLoaded', function() {
             textField.removeAttribute('disabled');
             textField.disabled = false;
             textField.style.display = '';
-            // Focus after a short delay
-            setTimeout(() => {
-                textField.focus();
-            }, 50);
+            // Fokus bare når brukeren selv huker av, ikke når en kollega gjør det (live).
+            if (!utenFokus) {
+                setTimeout(() => {
+                    textField.focus();
+                }, 50);
+            }
         } else {
             // Checkbox is unchecked: hide status options and disable text field
             statusDiv.style.display = 'none';
@@ -73,27 +75,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Bruk samme UI-logikk ved lasting av rapport som ved manuell avhuking.
-    window.applyLoadedHelicopterState = function(heliId, isChecked, notes, statusValue) {
-        const checkbox = document.getElementById(heliId);
-        if (!checkbox) return;
-
-        checkbox.checked = !!isChecked;
-        handleHelicopterChange(checkbox);
-
-        const textField = document.getElementById(heliId + 'Text');
-        const statusDiv = document.getElementById(heliId + 'Status');
-        if (!textField || !statusDiv) return;
-
-        if (checkbox.checked) {
-            textField.value = notes || '';
-            if (statusValue) {
-                const statusRadio = statusDiv.querySelector(`input[value="${statusValue}"]`);
-                if (statusRadio) statusRadio.checked = true;
-            }
-        }
-    };
-    
     // Add event listeners to all helicopter checkboxes
     const helicopterCheckboxes = document.querySelectorAll('.helicopter-checkbox');
     
@@ -102,22 +83,17 @@ document.addEventListener('DOMContentLoaded', function() {
             handleHelicopterChange(this);
         });
         // Sett initial visning ved last av side
-        handleHelicopterChange(checkbox);
+        handleHelicopterChange(checkbox, true);
     });
+    window.vaktHeliVis = function(checkbox) { handleHelicopterChange(checkbox, true); };
 
     // PDF Export functionality
     const exportPdfBtn = document.getElementById('exportPdf');
     const sharepointBtn = document.getElementById('openSharepointMappe');
     const sendEmailBtn = document.getElementById('sendEmail');
-    const saveDraftBtn = document.getElementById('saveDraft');
     exportPdfBtn.addEventListener('click', function() {
         generatePDF();
     });
-    if (saveDraftBtn) {
-        saveDraftBtn.addEventListener('click', function() {
-            saveDraftReport();
-        });
-    }
 
     // E-mail shortcut with prefilled recipients/subject/body
     if (sendEmailBtn) {
@@ -246,7 +222,24 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update display and dropdown
         updateSelectedPersonsDisplay();
         updatePersonDropdown();
+        if (window.vaktPersonEndret) window.vaktPersonEndret();
     }
+
+    // Fyller personvalget fra en kommaseparert tekst (brukes av live-status).
+    window.settPersonerFraTekst = function(tekst) {
+        const navn = String(tekst || '').split(',').map(n => n.trim()).filter(n => n);
+        const ekstra = [];
+        selectedPersons.length = 0;
+        navn.forEach(n => {
+            if (allAvailablePersons.includes(n)) {
+                if (!selectedPersons.includes(n)) selectedPersons.push(n);
+            } else {
+                ekstra.push(n);
+            }
+        });
+        document.getElementById('personExtra').value = ekstra.join(', ');
+        updatePersonField();
+    };
     
     // Update the display of selected persons
     function updateSelectedPersonsDisplay() {
@@ -447,6 +440,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    window.vaktOppdaterTittel = updateTitle;
+
     // «Basetekniker» er ikke en vakttype i dette skjemaet, men en snarvei til egen side.
     vakttypeSelect.addEventListener('change', function() {
         if (vakttypeSelect.value === 'Basetekniker') {
@@ -464,56 +459,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Reset title and hide status fields when form is reset
-    const reportForm = document.getElementById('reportForm');
-    reportForm.addEventListener('reset', function() {
-        setTimeout(() => {
-            clearLoadedDraftMeta();
-            reportTitle.textContent = 'Vaktrapport';
-            setDateToToday();
-            // Hide all helicopter status fields
-            document.querySelectorAll('.helicopter-status').forEach(statusDiv => {
-                statusDiv.style.display = 'none';
-            });
-            // Clear all helicopter status radio selections
-            document.querySelectorAll('.helicopter-status input[type="radio"]').forEach(radio => {
-                radio.checked = false;
-            });
-            // Clear person selections
-            selectedPersons = [];
-            if (window.selectedPersons) {
-                window.selectedPersons.length = 0;
-            }
-            document.getElementById('personDropdown').value = '';
-            document.getElementById('personExtra').value = '';
-            if (window.updatePersonField) {
-                window.updatePersonField();
-            }
-            if (window.updatePersonDropdown) {
-                window.updatePersonDropdown();
-            }
-            // Clear uploaded files
-            if (window.uploadedFiles) {
-                window.uploadedFiles.length = 0;
-            }
-            if (window.updateUploadedFilesDisplay) {
-                window.updateUploadedFilesDisplay();
-            }
-            // Nullstill steg-farger for prosessknapper.
-            if (sendEmailBtn) {
-                sendEmailBtn.classList.remove('btn-success');
-                sendEmailBtn.classList.add('btn-neutral');
-                sendEmailBtn.disabled = true;
-            }
-            if (sharepointBtn) {
-                sharepointBtn.classList.remove('btn-success');
-                sharepointBtn.classList.add('btn-neutral');
-                sharepointBtn.classList.add('is-disabled');
-                sharepointBtn.setAttribute('aria-disabled', 'true');
-                sharepointBtn.setAttribute('tabindex', '-1');
-            }
-        }, 0);
-    });
+    // Etter at PDF og e-post er sendt, nullstilles stegfargene når statusen nullstilles.
+    window.vaktNullstillSteg = function() {
+        if (window.uploadedFiles) window.uploadedFiles.length = 0;
+        if (window.updateUploadedFilesDisplay) window.updateUploadedFilesDisplay();
+        if (sendEmailBtn) {
+            sendEmailBtn.classList.remove('btn-success');
+            sendEmailBtn.classList.add('btn-neutral');
+            sendEmailBtn.disabled = true;
+        }
+        if (sharepointBtn) {
+            sharepointBtn.classList.remove('btn-success');
+            sharepointBtn.classList.add('btn-neutral');
+            sharepointBtn.classList.add('is-disabled');
+            sharepointBtn.setAttribute('aria-disabled', 'true');
+            sharepointBtn.setAttribute('tabindex', '-1');
+        }
+    };
 
     // Load and display report register
     const baseFilter = document.getElementById('reportBaseFilter');
@@ -521,11 +483,11 @@ document.addEventListener('DOMContentLoaded', function() {
         baseFilter.addEventListener('change', applyReportBaseFilter);
     }
     loadReportRegister();
+    vaktLiveStart();
 
 });
 
 // Store and retrieve reports: Firestore (felles) eller localStorage (lokal fallback)
-window.loadedDraftMeta = null;
 
 const DRAFT_EXPIRY_DAYS = 14;
 
@@ -575,115 +537,6 @@ function saveReportToRegister(reportData) {
     if (reports.length > 50) reports = reports.slice(0, 50);
     localStorage.setItem('vaktrapport_reports', JSON.stringify(reports));
     loadReportRegister();
-}
-
-function clearLoadedDraftMeta() {
-    window.loadedDraftMeta = null;
-}
-
-function removeLoadedDraftIfAny() {
-    var meta = window.loadedDraftMeta;
-    if (!meta || !meta.isDraft) return;
-
-    if (window.firestoreDb && meta.id) {
-        window.firestoreDb.collection('vaktrapporter').doc(meta.id).delete()
-            .then(function() {
-                clearLoadedDraftMeta();
-                loadReportRegister();
-            })
-            .catch(function(err) {
-                console.error('Firestore delete loaded draft error:', err);
-            });
-        return;
-    }
-
-    var reports = JSON.parse(localStorage.getItem('vaktrapport_reports') || '[]');
-    var draftIndex = -1;
-
-    if (typeof meta.index === 'number' && reports[meta.index] && reports[meta.index].isDraft) {
-        draftIndex = meta.index;
-    } else if (meta.timestamp) {
-        draftIndex = reports.findIndex(function(report) {
-            return !!report.isDraft && report.timestamp === meta.timestamp;
-        });
-    }
-
-    if (draftIndex !== -1) {
-        reports.splice(draftIndex, 1);
-        localStorage.setItem('vaktrapport_reports', JSON.stringify(reports));
-        loadReportRegister();
-    }
-
-    clearLoadedDraftMeta();
-}
-
-function collectCurrentReportData(isDraft) {
-    const date = (document.getElementById('date').value || '').trim();
-    const base = (document.getElementById('base').value || '').trim();
-    const vakttype = (document.getElementById('vakttype').value || '').trim();
-    const person = (document.getElementById('person').value || '').trim();
-    const statusBase = (document.getElementById('statusBase').value || '').trim();
-    const filePath = 'Sharepoint: \\Technical - Part-145\\Planning\\Status reports - Handover';
-
-    const kaffiChecked = document.getElementById('kaffi').checked;
-    const fuelTraktorChecked = document.getElementById('fuelTraktor').checked;
-    const vaskeGulvChecked = document.getElementById('vaskeGulv').checked;
-    const vaskeHelikopterChecked = document.getElementById('vaskeHelikopter').checked;
-    const tommeBossChecked = document.getElementById('tommeBoss').checked;
-
-    const heliOXH = document.getElementById('heliOXH').checked;
-    const heliOXHText = heliOXH ? document.getElementById('heliOXHText').value : '';
-    const heliOXHStatusRadio = heliOXH ? document.querySelector('input[name="heliOXHStatus"]:checked') : null;
-    const heliOXHStatus = heliOXHStatusRadio ? heliOXHStatusRadio.value : '';
-
-    const heliOXI = document.getElementById('heliOXI').checked;
-    const heliOXIText = heliOXI ? document.getElementById('heliOXIText').value : '';
-    const heliOXIStatusRadio = heliOXI ? document.querySelector('input[name="heliOXIStatus"]:checked') : null;
-    const heliOXIStatus = heliOXIStatusRadio ? heliOXIStatusRadio.value : '';
-
-    const heliOXJ = document.getElementById('heliOXJ').checked;
-    const heliOXJText = heliOXJ ? document.getElementById('heliOXJText').value : '';
-    const heliOXJStatusRadio = heliOXJ ? document.querySelector('input[name="heliOXJStatus"]:checked') : null;
-    const heliOXJStatus = heliOXJStatusRadio ? heliOXJStatusRadio.value : '';
-
-    const heliOXK = document.getElementById('heliOXK').checked;
-    const heliOXKText = heliOXK ? document.getElementById('heliOXKText').value : '';
-    const heliOXKStatusRadio = heliOXK ? document.querySelector('input[name="heliOXKStatus"]:checked') : null;
-    const heliOXKStatus = heliOXKStatusRadio ? heliOXKStatusRadio.value : '';
-
-    return {
-        date: date,
-        base: base,
-        vakttype: vakttype,
-        person: person,
-        statusBase: statusBase,
-        filePath: filePath,
-        kaffi: kaffiChecked,
-        fuelTraktor: fuelTraktorChecked,
-        vaskeGulv: vaskeGulvChecked,
-        vaskeHelikopter: vaskeHelikopterChecked,
-        tommeBoss: tommeBossChecked,
-        heliOXH: heliOXH,
-        heliOXHText: heliOXHText,
-        heliOXHStatus: heliOXHStatus,
-        heliOXI: heliOXI,
-        heliOXIText: heliOXIText,
-        heliOXIStatus: heliOXIStatus,
-        heliOXJ: heliOXJ,
-        heliOXJText: heliOXJText,
-        heliOXJStatus: heliOXJStatus,
-        heliOXK: heliOXK,
-        heliOXKText: heliOXKText,
-        heliOXKStatus: heliOXKStatus,
-        isDraft: !!isDraft,
-        timestamp: new Date().toISOString()
-    };
-}
-
-function saveDraftReport() {
-    const reportData = collectCurrentReportData(true);
-    saveReportToRegister(reportData);
-    alert('Utkast lagret i arkivet.');
 }
 
 function loadReportRegister() {
@@ -747,13 +600,12 @@ function applyReportBaseFilter() {
             return (r.base || '').trim() === selectedBase;
         });
 
-    // Bare siste ferdige rapport vises; eldre rapporter ligger i SharePoint.
-    // Utkast vises alle, siden de er arbeid som pågår.
-    var drafts = filtered.filter(function(r) { return !!r.isDraft; });
-    var latest = filtered.filter(function(r) { return !r.isDraft; })
+    // Bare siste eksporterte PDF vises; eldre rapporter ligger i SharePoint.
+    // Gamle utkast (fra før live-status) og live-dokumentene vises ikke.
+    var latest = filtered.filter(function(r) { return !r.isDraft && r.art !== 'live'; })
         .sort(function(a, b) { return (b.timestamp || '').localeCompare(a.timestamp || ''); })
         .slice(0, 1);
-    renderReportRegister(drafts.concat(latest), registerDiv);
+    renderReportRegister(latest, registerDiv);
 }
 
 function renderReportRegister(reports, registerDiv) {
@@ -761,8 +613,6 @@ function renderReportRegister(reports, registerDiv) {
         registerDiv.innerHTML = '<p class="no-reports">Ingen rapporter registrert</p>' + sharepointHenvisningHtml();
         return;
     }
-    var drafts = reports.filter(function(report) { return !!report.isDraft; });
-    var regular = reports.filter(function(report) { return !report.isDraft; });
 
     function renderRows(rows) {
         return rows.map(function(report, index) {
@@ -771,118 +621,19 @@ function renderReportRegister(reports, registerDiv) {
         var base = report.base || 'Ikke angitt';
         var vakttype = report.vakttype || '';
         var person = report.person || 'Ikke angitt';
-        var draftBadge = report.isDraft ? '<span class="report-badge">Utkast</span>' : '';
         return '<div class="report-item">' +
             '<div class="report-item-info">' +
-            '<div class="report-item-date">' + formatDate(reportDate) + draftBadge + '</div>' +
-            '<div class="report-item-details">Base: ' + base + (vakttype ? ' | Vakttype: ' + vakttype : '') + ' | Personer: ' + person + '</div>' +
+            '<div class="report-item-date">' + escapeHtml(formatDate(reportDate)) + '</div>' +
+            '<div class="report-item-details">Base: ' + escapeHtml(base) + (vakttype ? ' | Vakttype: ' + escapeHtml(vakttype) : '') + ' | Personer: ' + escapeHtml(person) + '</div>' +
             '</div>' +
             '<div class="report-item-actions">' +
-            '<button class="btn-small btn-view" onclick="loadReport(' + sourceIndex + ')">Vis</button>' +
             '<button class="btn-small btn-pdf" onclick="downloadReportPdf(' + sourceIndex + ')">PDF</button>' +
             '<button class="btn-small btn-delete" onclick="deleteReport(' + sourceIndex + ')">Slett</button>' +
             '</div></div>';
         }).join('');
     }
 
-    var sections = '';
-    if (drafts.length > 0) {
-        sections += '<h3 class="report-group-title">Utkast</h3>' + renderRows(drafts);
-    }
-    if (regular.length > 0) {
-        sections += '<h3 class="report-group-title">Siste rapport</h3>' + renderRows(regular);
-    }
-    registerDiv.innerHTML = sections + sharepointHenvisningHtml();
-}
-
-function loadReport(index) {
-    var reports = window.vaktrapportDocsList || [];
-    if (index < 0 || index >= reports.length) return;
-    var report = reports[index];
-    window.loadedDraftMeta = {
-        isDraft: !!report.isDraft,
-        id: report.id || null,
-        index: index,
-        timestamp: report.timestamp || null
-    };
-        
-        // Populate form with report data
-        setDateToToday();
-        if (report.base) document.getElementById('base').value = report.base;
-        if (report.vakttype) {
-            document.getElementById('vakttype').value = report.vakttype;
-            // Update title when loading report
-            const reportTitle = document.getElementById('reportTitle');
-            reportTitle.textContent = `Vaktrapport - ${report.vakttype}`;
-        }
-        
-        // Load person selections
-        if (report.person) {
-            const personNames = report.person.split(',').map(n => n.trim()).filter(n => n);
-            const knownNames = [
-                'Marius Høvik',
-                'Torfinn Roti',
-                'Eirik Dypevik',
-                'Johnny Mæland',
-                'Håvard Adsen',
-                'Odd Fiksdal',
-                'Johan Karlsson',
-                'Leif Rune Krogh Hus',
-                'Stig Hestad',
-                'Jøran Festervoll',
-                'Elliot Jaako',
-                'Gustav Svanstrøm',
-                'Andreas Valø',
-                'Luigino Visintini'
-            ];
-            const extraNames = [];
-            
-            // Clear previous selections
-            if (window.selectedPersons) {
-                window.selectedPersons.length = 0;
-            }
-            selectedPersons = [];
-            
-            personNames.forEach(name => {
-                if (knownNames.includes(name)) {
-                    if (!selectedPersons.includes(name)) {
-                        selectedPersons.push(name);
-                    }
-                } else if (name) {
-                    extraNames.push(name);
-                }
-            });
-            
-            if (extraNames.length > 0) {
-                document.getElementById('personExtra').value = extraNames.join(', ');
-            } else {
-                document.getElementById('personExtra').value = '';
-            }
-            
-            if (window.updatePersonField) {
-                window.updatePersonField();
-            }
-            if (window.updatePersonDropdown) {
-                window.updatePersonDropdown();
-            }
-        }
-        document.getElementById('statusBase').value = report.statusBase || '';
-        
-        document.getElementById('kaffi').checked = report.kaffi || false;
-        document.getElementById('fuelTraktor').checked = report.fuelTraktor || false;
-        document.getElementById('vaskeGulv').checked = report.vaskeGulv || false;
-        document.getElementById('vaskeHelikopter').checked = report.vaskeHelikopter || false;
-        document.getElementById('tommeBoss').checked = report.tommeBoss || false;
-        
-        if (window.applyLoadedHelicopterState) {
-            window.applyLoadedHelicopterState('heliOXH', report.heliOXH, report.heliOXHText, report.heliOXHStatus);
-            window.applyLoadedHelicopterState('heliOXI', report.heliOXI, report.heliOXIText, report.heliOXIStatus);
-            window.applyLoadedHelicopterState('heliOXJ', report.heliOXJ, report.heliOXJText, report.heliOXJStatus);
-            window.applyLoadedHelicopterState('heliOXK', report.heliOXK, report.heliOXKText, report.heliOXKStatus);
-        }
-        
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    registerDiv.innerHTML = renderRows(reports) + sharepointHenvisningHtml();
 }
 
 function downloadReportPdf(index) {
@@ -1606,7 +1357,6 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
     };
     if (shouldSaveToRegister) {
         saveReportToRegister(reportData);
-        removeLoadedDraftIfAny();
     }
     
     // Add footer to all pages
@@ -1638,3 +1388,320 @@ function generatePDFContent(doc, date, base, vakttype, person, statusBase, fileP
 }
 
 // formatDate, formatDateForFilename og sanitizeForFilename ligger i common.js.
+
+// ============================================
+// LIVE STATUS PER BASE
+// ============================================
+// Alt i skjemaet (unntatt dato og vedlegg) lagres fortløpende i Firestore som
+// dokumentet «live-<base>» i samlingen vaktrapporter, og vises med en gang hos
+// alle som har valgt samme base, slik som på baseteknikersiden. Det finnes
+// derfor ingen utkast: ved vaktslutt eksporteres PDF, og siste PDF ligger i
+// arkivet nederst. Hvert felt lagres for seg (merge), så to personer kan
+// skrive i hvert sitt felt samtidig uten å overskrive hverandre.
+
+const VAKT_HELIKOPTRE = ['heliOXH', 'heliOXI', 'heliOXJ', 'heliOXK'];
+const VAKT_KONTROLLPUNKTER = ['kaffi', 'fuelTraktor', 'vaskeGulv', 'vaskeHelikopter', 'tommeBoss'];
+const VAKT_TEKSTFELT = ['statusBase'].concat(VAKT_HELIKOPTRE.map(function(h) { return h + 'Text'; }));
+const VAKT_LIVE_FELT = ['vakttype', 'person', 'statusBase']
+    .concat(VAKT_KONTROLLPUNKTER)
+    .concat([].concat.apply([], VAKT_HELIKOPTRE.map(function(h) { return [h, h + 'Text', h + 'Status']; })));
+const VAKT_SIST_BASE = 'vakt_sist_base';
+
+var vaktLiveBase = '';
+var vaktLiveStopp = null;
+var vaktLiveKlar = false;     // første svar for basen er mottatt
+var vaktAnvender = false;     // skjemaet fylles fra live-data (ikke lagre tilbake)
+var vaktVentende = {};        // felt -> timer for lagring mens man skriver
+var vaktLiveData = {};
+var vaktFraAnnenBase = false; // skjemaet viser en annen base sin status
+
+function vaktLiveDokId(base) {
+    return 'live-' + base;
+}
+
+function vaktLesFelt(felt) {
+    if (felt === 'person') return (document.getElementById('person').value || '').trim();
+    if (/Status$/.test(felt) && VAKT_HELIKOPTRE.indexOf(felt.replace(/Status$/, '')) !== -1) {
+        var radio = document.querySelector('input[name="' + felt + '"]:checked');
+        return radio ? radio.value : '';
+    }
+    var el = document.getElementById(felt);
+    if (!el) return '';
+    if (el.type === 'checkbox') return el.checked;
+    return el.value;
+}
+
+function vaktLagreFelter(felter) {
+    if (!vaktLiveBase || !vaktLiveKlar || vaktAnvender) return;
+    var data = { base: vaktLiveBase, art: 'live', oppdatert: new Date().toISOString() };
+    felter.forEach(function(felt) { data[felt] = vaktLesFelt(felt); });
+    Object.assign(vaktLiveData, data);
+    var base = vaktLiveBase;
+
+    if (window.firestoreDb) {
+        window.firestoreDb.collection('vaktrapporter').doc(vaktLiveDokId(base)).set(data, { merge: true })
+            .catch(function(err) {
+                console.error('Kunne ikke lagre live-status:', err);
+                vaktVisLiveInfo('Kunne ikke lagre. Sjekk nettforbindelsen – endringene dine er ikke delt.', true);
+            });
+    } else {
+        try {
+            var lagret = JSON.parse(localStorage.getItem('vakt_live_' + base) || '{}');
+            localStorage.setItem('vakt_live_' + base, JSON.stringify(Object.assign(lagret, data)));
+        } catch (e) { /* lagring ikke tilgjengelig */ }
+    }
+    vaktVisLiveInfo();
+}
+
+// Tekst lagres når man tar en liten pause i skrivingen, så det ikke blir en
+// lagring per tastetrykk.
+function vaktPlanleggLagring(felt, ms) {
+    if (vaktAnvender) return;
+    clearTimeout(vaktVentende[felt]);
+    vaktVentende[felt] = setTimeout(function() {
+        delete vaktVentende[felt];
+        vaktLagreFelter([felt]);
+    }, ms);
+}
+
+function vaktLagreNaa(felt) {
+    if (vaktVentende[felt] === undefined) return;
+    clearTimeout(vaktVentende[felt]);
+    delete vaktVentende[felt];
+    vaktLagreFelter([felt]);
+}
+
+function vaktLagreAltVentende() {
+    Object.keys(vaktVentende).forEach(vaktLagreNaa);
+}
+
+// Et felt man skriver i (eller har ulagret tekst i) overskrives ikke av live-data.
+// Ved bytte av base (tving) overskrives alt, så ingenting henger igjen fra forrige base.
+var vaktTving = false;
+function vaktErIBruk(el, felt) {
+    if (vaktTving) return false;
+    return (el && document.activeElement === el) || vaktVentende[felt] !== undefined;
+}
+
+function vaktBrukLiveData(data, tving) {
+    vaktLiveData = data || {};
+    vaktAnvender = true;
+    vaktTving = !!tving;
+    try {
+        var vakttype = document.getElementById('vakttype');
+        if (!vaktErIBruk(vakttype, 'vakttype')) {
+            var verdi = vaktLiveData.vakttype || '';
+            vakttype.value = Array.prototype.some.call(vakttype.options, function(o) { return o.value === verdi; }) ? verdi : '';
+            if (window.vaktOppdaterTittel) window.vaktOppdaterTittel();
+        }
+
+        var ekstra = document.getElementById('personExtra');
+        if (!vaktErIBruk(ekstra, 'person') && window.settPersonerFraTekst &&
+            (vaktLiveData.person || '') !== (document.getElementById('person').value || '').trim()) {
+            window.settPersonerFraTekst(vaktLiveData.person || '');
+        }
+
+        var status = document.getElementById('statusBase');
+        if (!vaktErIBruk(status, 'statusBase') && status.value !== (vaktLiveData.statusBase || '')) {
+            status.value = vaktLiveData.statusBase || '';
+        }
+
+        VAKT_KONTROLLPUNKTER.forEach(function(id) {
+            document.getElementById(id).checked = !!vaktLiveData[id];
+        });
+
+        VAKT_HELIKOPTRE.forEach(function(h) {
+            var boks = document.getElementById(h);
+            var paa = !!vaktLiveData[h];
+            if (boks.checked !== paa) {
+                boks.checked = paa;
+                if (window.vaktHeliVis) window.vaktHeliVis(boks);
+            }
+            if (!paa) return;
+            var tekst = document.getElementById(h + 'Text');
+            if (!vaktErIBruk(tekst, h + 'Text') && tekst.value !== (vaktLiveData[h + 'Text'] || '')) {
+                tekst.value = vaktLiveData[h + 'Text'] || '';
+            }
+            document.querySelectorAll('input[name="' + h + 'Status"]').forEach(function(radio) {
+                radio.checked = radio.value === vaktLiveData[h + 'Status'];
+            });
+        });
+    } finally {
+        vaktAnvender = false;
+        vaktTving = false;
+    }
+    vaktVisLiveInfo();
+}
+
+function vaktFormatTid(iso) {
+    var d = new Date(iso || '');
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString('no-NO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function vaktVisLiveInfo(feilmelding, erFeil) {
+    var el = document.getElementById('vaktLiveInfo');
+    if (!el) return;
+    el.classList.toggle('er-feil', !!erFeil);
+    if (feilmelding) {
+        el.textContent = feilmelding;
+        return;
+    }
+    if (!vaktLiveBase) {
+        el.innerHTML = 'Velg base for å se og dele live status for vakten.';
+        return;
+    }
+    if (!vaktLiveKlar) {
+        el.innerHTML = '<span class="live-badge">Live</span> Henter status for ' + escapeHtml(vaktLiveBase) + '…';
+        return;
+    }
+    var tid = vaktFormatTid(vaktLiveData.oppdatert);
+    el.innerHTML = '<span class="live-badge">Live</span> ' + escapeHtml(vaktLiveBase) +
+        (tid ? ' · sist oppdatert ' + escapeHtml(tid) : '') +
+        ' · Endringer lagres fortløpende og vises for alle på basen.';
+}
+
+function vaktMottaLiveData(base, data) {
+    if (base !== vaktLiveBase) return;
+    var forste = !vaktLiveKlar;
+    vaktLiveKlar = true;
+    if (forste && !data) {
+        if (vaktFraAnnenBase) {
+            // Byttet fra en annen base: start tomt, ikke kopier den andre basens status.
+            vaktBrukLiveData({}, true);
+        } else {
+            // Første gang basen brukes: det som står i skjemaet blir utgangspunktet.
+            vaktLagreFelter(VAKT_LIVE_FELT);
+        }
+        return;
+    }
+    vaktBrukLiveData(data || {}, forste);
+}
+
+function vaktByttBase(base) {
+    vaktLagreAltVentende();
+    if (vaktLiveStopp) vaktLiveStopp();
+    vaktLiveStopp = null;
+    vaktFraAnnenBase = vaktFraAnnenBase || !!vaktLiveBase;
+    vaktLiveBase = base || '';
+    vaktLiveKlar = false;
+    vaktLiveData = {};
+    try {
+        if (base) localStorage.setItem(VAKT_SIST_BASE, base);
+    } catch (e) { /* lagring ikke tilgjengelig */ }
+    vaktVisLiveInfo();
+    if (!base) return;
+
+    if (window.firestoreDb) {
+        vaktLiveStopp = window.firestoreDb.collection('vaktrapporter').doc(vaktLiveDokId(base))
+            .onSnapshot(function(snap) {
+                vaktMottaLiveData(base, snap.exists ? snap.data() : null);
+            }, function(err) {
+                console.error('Kunne ikke hente live-status:', err);
+                vaktVisLiveInfo('Kunne ikke hente live-status fra skyen. Sjekk nettforbindelsen.', true);
+            });
+        return;
+    }
+    var lokal = null;
+    try { lokal = JSON.parse(localStorage.getItem('vakt_live_' + base) || 'null'); } catch (e) { /* ugyldig */ }
+    vaktMottaLiveData(base, lokal);
+}
+
+function vaktFeltFraElement(el) {
+    if (!el) return '';
+    if (el.name && /^heliOX.Status$/.test(el.name)) return el.name;
+    if (VAKT_TEKSTFELT.indexOf(el.id) !== -1 || VAKT_KONTROLLPUNKTER.indexOf(el.id) !== -1) return el.id;
+    return '';
+}
+
+// Nullstiller live-statusen for basen (for alle). Spør først.
+function vaktNullstillLive() {
+    if (!vaktLiveBase) {
+        alert('Velg base først.');
+        return;
+    }
+    if (!confirm('Nullstille alt for ' + vaktLiveBase + '?\n\nStatus, personer, helikoptre og kontrollpunkter ' +
+        'tømmes for alle som jobber på basen. Siste PDF i arkivet berøres ikke.')) return;
+    Object.keys(vaktVentende).forEach(function(f) { clearTimeout(vaktVentende[f]); });
+    vaktVentende = {};
+    var tom = { base: vaktLiveBase, art: 'live', oppdatert: new Date().toISOString() };
+    VAKT_LIVE_FELT.forEach(function(felt) {
+        tom[felt] = (VAKT_KONTROLLPUNKTER.indexOf(felt) !== -1 || VAKT_HELIKOPTRE.indexOf(felt) !== -1) ? false : '';
+    });
+    if (window.firestoreDb) {
+        window.firestoreDb.collection('vaktrapporter').doc(vaktLiveDokId(vaktLiveBase)).set(tom)
+            .catch(function(err) {
+                console.error('Kunne ikke nullstille:', err);
+                alert('Kunne ikke nullstille. Sjekk nettforbindelsen og prøv igjen.');
+            });
+    } else {
+        try { localStorage.setItem('vakt_live_' + vaktLiveBase, JSON.stringify(tom)); } catch (e) { /* lagring ikke tilgjengelig */ }
+        vaktBrukLiveData(tom);
+    }
+    if (window.vaktNullstillSteg) window.vaktNullstillSteg();
+}
+
+function vaktLiveStart() {
+    var skjema = document.getElementById('reportForm');
+    var baseValg = document.getElementById('base');
+
+    // Enter i et felt skal aldri sende skjemaet og laste siden på nytt.
+    skjema.addEventListener('submit', function(e) { e.preventDefault(); });
+    skjema.addEventListener('input', function(e) {
+        var felt = vaktFeltFraElement(e.target);
+        if (felt && VAKT_TEKSTFELT.indexOf(felt) !== -1) vaktPlanleggLagring(felt, 600);
+    });
+    skjema.addEventListener('change', function(e) {
+        var el = e.target;
+        if (el.id === 'base') {
+            vaktByttBase(el.value);
+            return;
+        }
+        if (el.id === 'vakttype') {
+            if (el.value !== 'Basetekniker') vaktLagreFelter(['vakttype']);
+            return;
+        }
+        if (el.id === 'personDropdown' || el.id === 'personExtra') {
+            vaktLagreNaa('person');
+            return;
+        }
+        if (el.classList.contains('helicopter-checkbox')) {
+            vaktLagreFelter([el.id, el.id + 'Text', el.id + 'Status']);
+            return;
+        }
+        var felt = vaktFeltFraElement(el);
+        if (!felt) return;
+        if (VAKT_TEKSTFELT.indexOf(felt) !== -1) vaktLagreNaa(felt);
+        else vaktLagreFelter([felt]);
+    });
+    skjema.addEventListener('focusout', function(e) {
+        var felt = vaktFeltFraElement(e.target);
+        if (felt) vaktLagreNaa(felt);
+        if (e.target.id === 'personExtra') vaktLagreNaa('person');
+    });
+
+    window.vaktPersonEndret = function() {
+        vaktPlanleggLagring('person', 600);
+    };
+
+    var nullstill = document.getElementById('resetLive');
+    if (nullstill) nullstill.addEventListener('click', vaktNullstillLive);
+
+    // Ulagret tekst sendes før siden lukkes eller legges i bakgrunnen.
+    window.addEventListener('pagehide', vaktLagreAltVentende);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') vaktLagreAltVentende();
+    });
+    // Uten Firebase: hold flere faner i samme nettleser i takt.
+    window.addEventListener('storage', function(e) {
+        if (!window.firestoreDb && vaktLiveBase && e.key === 'vakt_live_' + vaktLiveBase) {
+            try { vaktBrukLiveData(JSON.parse(e.newValue || '{}')); } catch (err) { /* ugyldig */ }
+        }
+    });
+
+    var sist = '';
+    try { sist = localStorage.getItem(VAKT_SIST_BASE) || ''; } catch (e) { /* lagring ikke tilgjengelig */ }
+    var gyldig = Array.prototype.some.call(baseValg.options, function(o) { return o.value && o.value === sist; });
+    if (gyldig) baseValg.value = sist;
+    vaktByttBase(baseValg.value);
+}
